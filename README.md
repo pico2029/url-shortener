@@ -1,47 +1,47 @@
 # URL Shortener
 
-Scheletro di un’applicazione per accorciare URL, con **backend Java/Spring Boot**, **frontend React/TypeScript**, **PostgreSQL** e **Redis**. Build ed esecuzione sono gestite interamente tramite **Docker Compose**.
+An application skeleton for shortening URLs, built with a **Java/Spring Boot backend**, a **React/TypeScript frontend**, **PostgreSQL**, and **Redis**. All builds and services run through **Docker Compose**.
 
-## Stato del progetto
+## Project status
 
-Il progetto contiene la struttura iniziale e le configurazioni necessarie per sviluppare le funzionalità in modo incrementale.
+The project provides the initial structure and configuration for implementing features incrementally.
 
-| Disponibile | Da implementare |
+| Available | To be implemented |
 |---|---|
-| Punto d’avvio Spring Boot | Creazione e redirect dei link |
-| Pagina React statica | Dashboard e gestione dei link |
-| Configurazione PostgreSQL e Redis | Cache applicativa e rate limiting |
-| Flyway e Spring Data JPA configurati | Entità, repository e migrazioni di dominio |
-| Spring Security con comportamento automatico | Registrazione, login e JWT |
-| OpenAPI, Swagger UI e health check | Documentazione degli endpoint applicativi |
-| Dockerfile multistadio e Docker Compose | Analytics, alias e scadenze |
-| Script di verifica dell’infrastruttura | Test unitari e di integrazione delle funzionalità |
+| Spring Boot entry point | Link creation and redirects |
+| Static React page | Dashboard and link management |
+| PostgreSQL and Redis configuration | Application caching and rate limiting |
+| Flyway and Spring Data JPA configuration | Entities, repositories, and domain migrations |
+| Spring Security with default behavior | Registration, login, and JWT authentication |
+| OpenAPI, Swagger UI, and health checks | Application endpoint documentation |
+| Multi-stage Dockerfiles and Docker Compose | Analytics, custom aliases, and expiration |
+| Infrastructure verification script | Feature unit and integration tests |
 
-**Non sono ancora presenti endpoint applicativi.** L’unica classe Java è `ShortenerApplication`; le cartelle delle funzionalità contengono `.gitkeep`, senza classi vuote preventive.
+**No application endpoints have been implemented yet.** The only Java class is `ShortenerApplication`. Feature directories contain `.gitkeep` files rather than empty placeholder classes.
 
-## Stack tecnologico
+## Technology stack
 
-| Area | Tecnologie configurate |
+| Area | Configured technologies |
 |---|---|
 | Backend | Java 21, Spring Boot 3.5.7, Spring Web |
-| Persistenza | Spring Data JPA, PostgreSQL 17.6, PostgreSQL JDBC |
-| Migrazioni | Flyway con supporto PostgreSQL |
+| Persistence | Spring Data JPA, PostgreSQL 17.6, PostgreSQL JDBC |
+| Migrations | Flyway with PostgreSQL support |
 | Cache | Redis 7.4.6, Spring Data Redis |
-| Sicurezza | Spring Security; JWT pianificato |
-| Frontend | React 19.2.0, TypeScript 5.9.3, HTML e CSS |
-| Build frontend | Vite 7.3.7, Node.js 22.21.1 e npm |
-| Build backend | Maven 3.9.11 |
-| Server e reverse proxy | Nginx 1.28.0 |
-| Documentazione API | OpenAPI e Swagger UI tramite springdoc-openapi 2.8.13 |
-| Stato del backend | Spring Boot Actuator |
-| Dipendenze di test | JUnit 5, Mockito, Testcontainers |
-| Containerizzazione | Docker e Docker Compose |
+| Security | Spring Security; JWT authentication is planned |
+| Frontend | React 19.2.0, TypeScript 5.9.3, HTML, and CSS |
+| Frontend build | Vite 7.3.7, Node.js 22.21.1, and npm |
+| Backend build | Maven 3.9.11 |
+| Web server and reverse proxy | Nginx 1.28.0 |
+| API documentation | OpenAPI and Swagger UI through springdoc-openapi 2.8.13 |
+| Backend health | Spring Boot Actuator |
+| Test dependencies | JUnit 5, Mockito, Testcontainers |
+| Containerization | Docker and Docker Compose |
 
-JUnit, Mockito e Testcontainers sono predisposti come dipendenze: non ci sono ancora test Java. La repository attuale **non contiene workflow GitHub Actions**; i controlli si eseguono manualmente con lo script incluso.
+JUnit, Mockito, and Testcontainers are included as dependencies, but there are no Java tests yet. The repository currently **does not contain GitHub Actions workflows**. Checks can be run manually using the included script.
 
-## Architettura
+## Architecture
 
-Il backend è un monolite organizzato per funzionalità. Frontend e backend hanno build e immagini indipendenti e comunicano attraverso Nginx.
+The backend is a monolith organized by feature. The frontend and backend have independent builds and images and communicate through Nginx.
 
 ```text
 Browser
@@ -51,7 +51,7 @@ http://localhost:8080
   |
   v
 frontend / Nginx :80
-  |-- /                         -> React compilato
+  |-- /                         -> compiled React application
   |-- /api/*                    -> backend :8080
   |-- /r/*                      -> backend :8080
   |-- /swagger-ui, /swagger-ui/* -> backend :8080
@@ -62,22 +62,22 @@ frontend / Nginx :80
                                       `-- Redis :6379
 ```
 
-### Servizi Docker
+### Docker services
 
-| Servizio | Responsabilità | Accesso dall’host |
+| Service | Responsibility | Host access |
 |---|---|---|
-| `frontend` | Nginx serve la SPA e inoltra le richieste al backend | Porta `8080`, configurabile |
-| `backend` | Esegue Spring Boot e le future API | Nessuna porta pubblicata |
-| `postgres` | Conserva i dati in un volume nominato | Nessuna porta pubblicata |
-| `redis` | Cache ricostruibile, senza persistenza | Nessuna porta pubblicata |
+| `frontend` | Nginx serves the SPA and forwards requests to the backend | Port `8080`, configurable |
+| `backend` | Runs Spring Boot and future APIs | No published ports |
+| `postgres` | Stores data in a named volume | No published ports |
+| `redis` | Provides a rebuildable cache without persistence | No published ports |
 
-La rete `ingress` collega frontend e backend. La rete `data`, configurata come interna, collega backend, PostgreSQL e Redis. Il frontend non accede direttamente ai servizi dati.
+The `ingress` network connects the frontend and backend. The internal `data` network connects the backend, PostgreSQL, and Redis. The frontend does not access the data services directly.
 
-Gli health check attendono PostgreSQL e Redis prima del backend e il backend prima del frontend. Actuator espone internamente `/actuator/health`, includendo database e Redis senza dettagli sensibili; Nginx ne blocca l’accesso esterno. Nginx espone `/healthz` per il proprio health check.
+Health checks ensure that PostgreSQL and Redis are healthy before the backend starts, and that the backend is healthy before the frontend starts. Actuator exposes `/actuator/health` internally, checking both the database and Redis without revealing sensitive details. Nginx blocks external access to this endpoint and exposes `/healthz` for its own health check.
 
-I Dockerfile usano build multistadio: Maven/JDK produce il JAR eseguito con Java; Node/npm produce i file statici serviti da Nginx. Maven e npm non devono essere installati sull’host.
+The Dockerfiles use multi-stage builds: Maven/JDK produces the JAR executed by Java, while Node/npm produces the static files served by Nginx. Maven and npm do not need to be installed on the host.
 
-## Struttura del repository
+## Repository structure
 
 ```text
 .
@@ -120,122 +120,122 @@ I Dockerfile usano build multistadio: Maven/JDK produce il JAR eseguito con Java
 └── README.md
 ```
 
-### Confini delle funzionalità
+### Feature boundaries
 
-| Modulo backend | Responsabilità futura |
+| Backend module | Future responsibility |
 |---|---|
-| `link` | Creazione, gestione, alias, scadenza, cache e redirect |
-| `auth` | Registrazione e login |
-| `user` | Dati e persistenza degli utenti |
-| `analytics` | Eventi click e statistiche |
-| `security` | Verifica JWT e autorizzazioni |
-| `ratelimit` | Limiti delle richieste tramite Redis |
-| `shared` | Configurazioni comuni e gestione degli errori |
+| `link` | Link creation, management, aliases, expiration, caching, and redirects |
+| `auth` | Registration and login |
+| `user` | User data and persistence |
+| `analytics` | Click events and statistics |
+| `security` | JWT verification and authorization |
+| `ratelimit` | Request limits using Redis |
+| `shared` | Common configuration and error handling |
 
-All’interno dei moduli, controller, servizi, repository, entità e DTO saranno aggiunti insieme alle funzionalità che li richiedono. Il frontend mantiene una separazione analoga in `features`; `app` contiene l’avvio e `shared` è riservata agli elementi riutilizzabili.
+Controllers, services, repositories, entities, and DTOs will be added inside each module when their features are implemented. The frontend follows a similar separation in `features`. The `app` directory contains the entry point, while `shared` is reserved for reusable elements.
 
-## Avvio
+## Getting started
 
-Occorre Docker Engine con Docker Compose oppure Docker Desktop **in esecuzione**. Il primo avvio richiede Internet per scaricare immagini e dipendenze.
+Docker Engine with Docker Compose, or Docker Desktop, must be **running**. The first build requires an internet connection to download images and dependencies.
 
-Dalla radice del repository:
+From the repository root:
 
 ```bash
 docker compose up --build
 ```
 
-Aprire [http://localhost:8080](http://localhost:8080). Per avviare in background e attendere gli health check:
+Open [http://localhost:8080](http://localhost:8080). To start in the background and wait for health checks:
 
 ```bash
 docker compose up --build -d --wait --wait-timeout 180
 ```
 
-### Gestione
+### Service management
 
 ```bash
-# Validazione della configurazione
+# Validate the configuration
 docker compose config --quiet
 
-# Compilazione delle immagini
+# Build the images
 docker compose build
 
-# Stato dei servizi
+# Show service status
 docker compose ps
 
-# Log dei servizi
+# Follow service logs
 docker compose logs -f
 
-# Arresto e rimozione dei container, conservando il database
+# Stop and remove containers while preserving the database
 docker compose down
 ```
 
-Il volume `postgres-data` conserva il database dopo `down` e dopo la ricreazione dei container. L’opzione `--volumes` elimina anche i dati: non usarla se devono essere conservati.
+The `postgres-data` volume preserves the database after `down` and after container recreation. The `--volumes` option also deletes the data; do not use it if the data must be retained.
 
-## Configurazione
+## Configuration
 
-L’avvio funziona con i valori locali predefiniti, senza creare `.env`. Per personalizzarli, copiare `.env.example` in `.env` e modificarlo. `.env` è escluso da Git.
+The application starts with local defaults without requiring a `.env` file. To customize them, copy `.env.example` to `.env` and edit the values. `.env` is excluded from Git.
 
-| Variabile Compose | Default | Utilizzo |
+| Compose variable | Default | Purpose |
 |---|---|---|
-| `PUBLIC_PORT` | `8080` | Porta pubblica di Nginx |
-| `POSTGRES_DB` | `shortener` | Nome del database |
-| `POSTGRES_USER` | `shortener` | Utente PostgreSQL |
-| `POSTGRES_PASSWORD` | `shortener-local` | Password locale PostgreSQL |
+| `PUBLIC_PORT` | `8080` | Public Nginx port |
+| `POSTGRES_DB` | `shortener` | Database name |
+| `POSTGRES_USER` | `shortener` | PostgreSQL user |
+| `POSTGRES_PASSWORD` | `shortener-local` | Local PostgreSQL password |
 
-Le credenziali predefinite sono solo per lo sviluppo locale. Compose passa al backend `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`, `REDIS_HOST` e `REDIS_PORT`. I nomi `postgres` e `redis` sono indirizzi interni Docker. Il futuro frontend userà percorsi relativi `/api/v1/*`.
+Default credentials are for local development only. Compose passes `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`, `REDIS_HOST`, and `REDIS_PORT` to the backend. The names `postgres` and `redis` are internal Docker addresses. Future frontend API calls will use relative `/api/v1/*` paths.
 
-Flyway è abilitato, ma non sono presenti migrazioni applicative. Hibernate non genera tabelle; Flyway può creare la propria tabella tecnica di cronologia.
+Flyway is enabled, but there are no application migrations yet. Hibernate does not generate tables. Flyway may create its own schema history table.
 
-Spring Security conserva la configurazione automatica. Le richieste API con `Accept: application/json` ricevono `401`; Swagger richiede autenticazione. L’utente automatico è `user`, con password temporanea generata nei log del backend a ogni avvio. Questo comportamento non costituisce un sistema di account applicativi.
+Spring Security retains its default configuration. API requests with `Accept: application/json` receive `401`, and Swagger requires authentication. The default user is `user`, with a temporary password generated in the backend logs on each startup. This behavior is not an application account system.
 
-## Verifiche
+## Verification
 
-Dopo aver avviato i servizi:
+After starting the services:
 
 ```bash
 bash scripts/verify.sh
 ```
 
-Lo script usa Docker per verificare:
+The script uses Docker to verify:
 
-- Stato del backend, che dipende anche da PostgreSQL e Redis.
-- Pagina HTML e presenza del contenuto React compilato.
-- Inoltro di API, redirect, Swagger e OpenAPI al backend, con `401` atteso nello scheletro.
-- Blocco dell’accesso esterno ad Actuator.
-- Persistenza del cluster PostgreSQL dopo la ricreazione dei container.
+- Backend health, including PostgreSQL and Redis connectivity.
+- The HTML page and the presence of compiled React content.
+- Forwarding of API, redirect, Swagger, and OpenAPI requests to the backend, with `401` expected in the skeleton.
+- Blocking of external access to Actuator.
+- PostgreSQL cluster persistence after container recreation.
 
-La verifica ricrea tutti i container, causando una breve interruzione. Non aggiunge tabelle o dati applicativi.
+Verification recreates all containers, causing a brief interruption. It does not add application tables or data.
 
-La build backend esegue Maven `verify`; quella frontend esegue TypeScript e Vite. Quando saranno introdotti test Testcontainers, il container di test dovrà avere accesso al motore Docker.
+The backend build runs Maven `verify`; the frontend build runs TypeScript and Vite. When Testcontainers tests are introduced, the test container will need access to the Docker engine.
 
-Per rigenerare il lockfile senza installare npm sull’host:
+To regenerate the lockfile without installing npm on the host:
 
 ```bash
 docker run --rm --mount "type=bind,source=$PWD/frontend,target=/workspace" -w /workspace node:22.21.1-alpine npm install --package-lock-only --ignore-scripts
 ```
 
-## Contratti API pianificati
+## Planned API contracts
 
-Questi endpoint **non sono ancora implementati**:
+These endpoints **have not been implemented yet**:
 
-| Metodo | Percorso | Funzione futura |
+| Method | Path | Future behavior |
 |---|---|---|
-| `POST` | `/api/v1/links` | Creare un link breve |
-| `GET` | `/api/v1/links` | Elencare i propri link |
-| `DELETE` | `/api/v1/links/{shortCode}` | Eliminare un link |
-| `GET` | `/api/v1/links/{shortCode}/stats` | Consultare le statistiche |
-| `POST` | `/api/v1/auth/register` | Registrarsi |
-| `POST` | `/api/v1/auth/login` | Accedere |
-| `GET` | `/r/{shortCode}` | Redirect verso l’URL originale |
+| `POST` | `/api/v1/links` | Create a short link |
+| `GET` | `/api/v1/links` | List the user's links |
+| `DELETE` | `/api/v1/links/{shortCode}` | Delete a link |
+| `GET` | `/api/v1/links/{shortCode}/stats` | Retrieve link statistics |
+| `POST` | `/api/v1/auth/register` | Register an account |
+| `POST` | `/api/v1/auth/login` | Log in |
+| `GET` | `/r/{shortCode}` | Redirect to the original URL |
 
-Il prefisso `/r/` separa i link brevi dalle pagine della SPA. Nginx riserva già questi percorsi: richieste API e redirect non ricevono il fallback HTML del frontend.
+The `/r/` prefix separates short links from SPA pages. Nginx already reserves these paths: API and redirect requests do not receive the frontend HTML fallback.
 
 ## Roadmap
 
-1. **Link di base:** creazione, codici Base62 univoci, persistenza e redirect `302`.
-2. **Consolidamento:** migrazioni di dominio, validazione, gestione errori, test e documentazione API.
-3. **Prestazioni:** cache Redis con TTL e rate limiting.
-4. **Account:** registrazione, login JWT, proprietà dei link e alias personalizzati.
-5. **Analytics:** eventi click, scadenze e statistiche.
+1. **Core links:** creation, unique Base62 codes, persistence, and `302` redirects.
+2. **Backend foundations:** domain migrations, validation, error handling, tests, and API documentation.
+3. **Performance:** Redis caching with TTL and rate limiting.
+4. **Accounts:** registration, JWT login, link ownership, and custom aliases.
+5. **Analytics:** click events, expiration, and statistics.
 
-Hot reload, workflow CI, deployment pubblico, Kafka, Kubernetes e monitoraggio avanzato non fanno parte dello scheletro attuale.
+Hot reload, CI workflows, public deployment, Kafka, Kubernetes, and advanced monitoring are outside the current skeleton.
