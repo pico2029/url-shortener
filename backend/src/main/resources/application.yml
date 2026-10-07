@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: url-shortener
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://postgres:5432/shortener}
+    username: ${DATABASE_USER:shortener}
+    password: ${DATABASE_PASSWORD:shortener-local}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      connect-timeout: 2s
+      timeout: 2s
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
