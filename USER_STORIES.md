@@ -2,11 +2,11 @@
 
 ## Stato del progetto
 
-Il progetto è uno scheletro iniziale. Docker Compose, PostgreSQL, Redis e Nginx sono configurati; il backend contiene soltanto l'avvio di Spring Boot e il frontend una pagina statica. Le funzionalità applicative, le migrazioni di dominio e i test devono ancora essere implementati.
+US01 è implementata: creazione anonima tramite API e form React, validazione HTTP/HTTPS, codici Base62 univoci e persistenza PostgreSQL con migrazione Flyway e test. Il redirect US02 e le altre storie restano da implementare. Docker Compose, Redis e Nginx sono configurati.
 
 Questo documento definisce il lavoro necessario per realizzare le funzionalità previste nel [README](README.md): link brevi, account, dashboard, alias personalizzati, scadenza, cache, limiti delle richieste e statistiche. Il deployment pubblico resta fuori dal perimetro attuale.
 
-La pianificazione deriva dalla lettura del codice e della documentazione; non certifica l'esecuzione di build o servizi.
+Per US01 sono state eseguite build Docker, test unitari/API e PostgreSQL, verifica del form nel browser e controlli di persistenza dopo ricreazione dei container. Le altre storie descrivono lavoro pianificato.
 
 ## Divisione del lavoro tra due persone
 
@@ -31,7 +31,7 @@ Prima di implementare le funzionalità, concordare:
 - Numerazione delle migrazioni Flyway, per evitare conflitti.
 - Regole degli alias, fuso orario delle statistiche e soglie del rate limiting.
 
-**Decisione di prodotto ancora da fissare:** consentire la creazione di link senza account oppure richiedere sempre il login. La roadmap permette di partire con la creazione pubblica e aggiungere successivamente la gestione personale. Se si consente la creazione anonima, occorre definire separatamente se e come quei link possano essere gestiti in seguito.
+**Decisione confermata:** la creazione dei link è consentita senza account. Gli account serviranno alla gestione personale; proprietà e successiva gestione dei link anonimi restano da definire.
 
 ## User Story
 
@@ -221,6 +221,6 @@ Una User Story è completata quando:
 - La funzionalità è utilizzabile attraverso Docker Compose e il proxy Nginx.
 - L'interfaccia gestisce gli stati di caricamento, successo ed errore applicabili.
 
-Per chiudere il progetto occorre aggiornare anche [scripts/verify.sh](scripts/verify.sh): oggi verifica la pagina provvisoria e si aspetta `401` anche sui redirect. Deve verificare il comportamento dell'app completata e la persistenza dei link dopo la ricreazione dei container.
+Il file [scripts/verify.sh](scripts/verify.sh) verifica US01, gli input errati e la persistenza dei link dopo la ricreazione dei container. Per le storie successive occorre estenderlo: oggi gli endpoint non implementati, compresi i redirect, restano protetti e restituiscono `401`.
 
 Il progetto è completato quando due utenti possono registrarsi, creare e gestire separatamente i propri link; redirect, alias, scadenze, cache, limiti e statistiche funzionano; i test passano e il README descrive l'app reale.

@@ -2,10 +2,10 @@
 
 ## Project Structure & Module Organization
 
-This URL-shortener skeleton has no application features yet. Consult `README.md` for current behavior, `PRODUCT.md` for product decisions, and `USER_STORIES.md` for planned work.
+US01 provides anonymous link creation and an English React form. Redirects and the remaining stories are planned. Consult `README.md` for current behavior, `PRODUCT.md` for product decisions, and `USER_STORIES.md` for planned work.
 
 - `backend/`: Java 21/Spring Boot application. Organize code under `src/main/java/com/example/shortener/` by feature (`link`, `auth`, `user`, `analytics`, `security`, `ratelimit`); reserve `shared` for common code. Place tests in `src/test/java/` and Flyway migrations in `src/main/resources/db/migration/`.
-- `frontend/`: React/TypeScript application. `src/app/` contains the entry point and styles, `src/features/` holds feature code, and `src/shared/` holds reusable code. No asset directory exists yet.
+- `frontend/`: React/TypeScript application. `src/app/` contains the entry point and styles, `src/features/` holds feature code, `src/shared/` holds reusable code, and `src/assets/fonts/` holds self-hosted fonts and their licenses.
 - `compose.yml` wires Nginx, the backend, PostgreSQL, and Redis; `scripts/verify.sh` checks infrastructure.
 
 ## Build, Test, and Development Commands
@@ -26,7 +26,7 @@ Match existing style: four-space Java indentation; two-space TypeScript, CSS, YA
 
 ## Testing Guidelines
 
-JUnit 5, Mockito, and Testcontainers dependencies are available; no feature tests or coverage threshold exist. Mirror backend packages in tests, naming files `*Test.java` for Maven discovery. Testcontainers requires Docker. Add behavioral tests for new features; infrastructure verification does not validate application logic.
+JUnit 5, Mockito, and Testcontainers cover link creation; no coverage threshold exists. Mirror backend packages in tests, naming unit/API files `*Test.java` and PostgreSQL integration files `*IT.java`. Run integration tests with `mvn -Pintegration verify` or `bash scripts/test-integration.sh`; Testcontainers requires Docker. Add behavioral tests for new features; infrastructure verification complements application tests.
 
 ## Commit & Pull Request Guidelines
 
@@ -35,3 +35,28 @@ Commits use imperative descriptions, such as `Fix Readme`; no prefix convention 
 ## Security & Configuration
 
 Use `.env.example` as the configuration reference; keep credentials out of Git. Local defaults are development-only. Use Flyway for schema changes: Hibernate table generation is disabled. Avoid `docker compose down --volumes` when database data must be retained.
+
+## Spring Boot Architecture and Code Quality
+
+- Organize code by feature. Keep controllers focused on HTTP concerns, services on application behavior, and repositories on persistence.
+- Use constructor injection and explicit dependencies. Avoid field injection and unnecessary interfaces or abstractions.
+- Use dedicated request and response DTOs; do not expose JPA entities through APIs.
+- Validate requests at the API boundary and enforce business invariants in the application layer. Use database constraints for guarantees under concurrency.
+- Define transaction boundaries around application operations. Keep network calls outside database transactions.
+- Handle API errors consistently with appropriate HTTP statuses. Never expose stack traces, credentials, or internal database details.
+- Use typed configuration properties for application settings and validate required configuration at startup.
+- Keep schema changes in Flyway migrations. Choose entity relationships and fetch strategies deliberately; avoid accidental eager loading and N+1 queries.
+- Test observable behavior with focused unit tests, API tests, and PostgreSQL integration tests where persistence semantics matter.
+
+## React Architecture and Code Quality
+
+- Use function components and follow the Rules of Hooks. Keep rendering pure and never mutate props or state.
+- Organize UI and behavior by feature. Extract reusable components and hooks when reuse or complexity justifies them.
+- Keep state minimal and close to its consumers. Derive values during rendering instead of duplicating them in state.
+- Use effects to synchronize with external systems, not for derived values or user actions that belong in event handlers.
+- Keep HTTP requests and transport types separate from presentation components. Handle errors and stale or cancelled requests explicitly.
+- Preserve strict TypeScript checking. Avoid `any`, unsafe assertions, and unnecessary non-null assertions.
+- Use semantic HTML, associated form labels, keyboard-accessible controls, and accessible feedback.
+- Handle loading, success, validation, and service-error states explicitly. Prevent duplicate submissions and preserve user input after failures.
+- Add dependencies, global state, and memoization only when a concrete requirement justifies them.
+- Test user-visible behavior rather than component implementation details.

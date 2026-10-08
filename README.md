@@ -1,241 +1,106 @@
 # URL Shortener
 
-An application skeleton for shortening URLs, built with a **Java/Spring Boot backend**, a **React/TypeScript frontend**, **PostgreSQL**, and **Redis**. All builds and services run through **Docker Compose**.
+A Java 21/Spring Boot and React/TypeScript application using PostgreSQL, Redis, and Nginx through Docker Compose.
 
-## Project status
+## Current behavior
 
-The project provides the initial structure and configuration for implementing features incrementally.
+US01 is implemented: visitors can create short links without an account. The form accepts complete HTTP/HTTPS destinations, persists each submission in PostgreSQL, and displays a full short URL. Every submission generates a new code, even for an existing destination.
 
-| Available | To be implemented |
-|---|---|
-| Spring Boot entry point | Link creation and redirects |
-| Static React page | Dashboard and link management |
-| PostgreSQL and Redis configuration | Application caching and rate limiting |
-| Flyway and Spring Data JPA configuration | Entities, repositories, and domain migrations |
-| Spring Security with default behavior | Registration, login, and JWT authentication |
-| OpenAPI, Swagger UI, and health checks | Application endpoint documentation |
-| Multi-stage Dockerfiles and Docker Compose | Analytics, custom aliases, and expiration |
-| Infrastructure verification script | Feature unit and integration tests |
+**Redirects are not implemented yet (US02).** Generated `/r/{shortCode}` URLs can be selected and copied manually but do not yet open the destination. One-click copying, accounts, dashboard, aliases, expiration, caching, rate limits, and analytics remain planned.
 
-**No application endpoints have been implemented yet.** The only Java class is `ShortenerApplication`. Feature directories contain `.gitkeep` files rather than empty placeholder classes.
+## Architecture and structure
 
-## Technology stack
+The backend is a monolith organized by feature under `backend/src/main/java/com/example/shortener/`. The `link` module owns creation, validation, DTOs, persistence, and generation; `security` owns endpoint access; `shared` contains common API error handling. Database changes use Flyway in `backend/src/main/resources/db/migration/`; Hibernate schema generation is disabled.
 
-| Area | Configured technologies |
-|---|---|
-| Backend | Java 21, Spring Boot 3.5.7, Spring Web |
-| Persistence | Spring Data JPA, PostgreSQL 17.6, PostgreSQL JDBC |
-| Migrations | Flyway with PostgreSQL support |
-| Cache | Redis 7.4.6, Spring Data Redis |
-| Security | Spring Security; JWT authentication is planned |
-| Frontend | React 19.2.0, TypeScript 5.9.3, HTML, and CSS |
-| Frontend build | Vite 7.3.7, Node.js 22.21.1, and npm |
-| Backend build | Maven 3.9.11 |
-| Web server and reverse proxy | Nginx 1.28.0 |
-| API documentation | OpenAPI and Swagger UI through springdoc-openapi 2.8.13 |
-| Backend health | Spring Boot Actuator |
-| Test dependencies | JUnit 5, Mockito, Testcontainers |
-| Containerization | Docker and Docker Compose |
+The frontend uses React function components and strict TypeScript. `src/app/` owns the entry point and styles, `src/features/links/` owns the form and typed API client, and `src/shared/` is reserved for reusable code.
 
-JUnit, Mockito, and Testcontainers are included as dependencies, but there are no Java tests yet. The repository currently **does not contain GitHub Actions workflows**. Checks can be run manually using the included script.
+Nginx serves React on `http://localhost:8080`, proxies `/api/*`, `/r/*`, Swagger, and OpenAPI to the backend, and blocks external Actuator access. The backend has no published port. PostgreSQL and Redis are on the internal data network; PostgreSQL uses a named persistent volume. Redis is configured but not used by link creation.
 
-## Architecture
+Versions: Spring Boot 3.5.7, PostgreSQL 17.6, Redis 7.4.6, React 19.2.0, TypeScript 5.9.3, Vite 7.3.7, Node 22.21.1, Maven 3.9.11, Nginx 1.28.0. JUnit 5, Mockito, and Testcontainers cover backend behavior. No CI workflow is configured.
 
-The backend is a monolith organized by feature. The frontend and backend have independent builds and images and communicate through Nginx.
+## Run locally
 
-```text
-Browser
-  |
-  v
-http://localhost:8080
-  |
-  v
-frontend / Nginx :80
-  |-- /                         -> compiled React application
-  |-- /api/*                    -> backend :8080
-  |-- /r/*                      -> backend :8080
-  |-- /swagger-ui, /swagger-ui/* -> backend :8080
-  |-- /swagger-ui.html           -> backend :8080
-  `-- /v3/api-docs, /v3/api-docs/* -> backend :8080
-                                      |
-                                      |-- PostgreSQL :5432
-                                      `-- Redis :6379
-```
-
-### Docker services
-
-| Service | Responsibility | Host access |
-|---|---|---|
-| `frontend` | Nginx serves the SPA and forwards requests to the backend | Port `8080`, configurable |
-| `backend` | Runs Spring Boot and future APIs | No published ports |
-| `postgres` | Stores data in a named volume | No published ports |
-| `redis` | Provides a rebuildable cache without persistence | No published ports |
-
-The `ingress` network connects the frontend and backend. The internal `data` network connects the backend, PostgreSQL, and Redis. The frontend does not access the data services directly.
-
-Health checks ensure that PostgreSQL and Redis are healthy before the backend starts, and that the backend is healthy before the frontend starts. Actuator exposes `/actuator/health` internally, checking both the database and Redis without revealing sensitive details. Nginx blocks external access to this endpoint and exposes `/healthz` for its own health check.
-
-The Dockerfiles use multi-stage builds: Maven/JDK produces the JAR executed by Java, while Node/npm produces the static files served by Nginx. Maven and npm do not need to be installed on the host.
-
-## Repository structure
-
-```text
-.
-├── backend/
-│   ├── src/main/java/com/example/shortener/
-│   │   ├── ShortenerApplication.java
-│   │   ├── link/
-│   │   ├── auth/
-│   │   ├── user/
-│   │   ├── analytics/
-│   │   ├── security/
-│   │   ├── ratelimit/
-│   │   └── shared/
-│   ├── src/main/resources/
-│   │   ├── application.yml
-│   │   └── db/migration/
-│   ├── src/test/java/
-│   ├── pom.xml
-│   ├── Dockerfile
-│   └── .dockerignore
-├── frontend/
-│   ├── src/
-│   │   ├── app/
-│   │   ├── features/
-│   │   │   ├── links/
-│   │   │   ├── auth/
-│   │   │   └── analytics/
-│   │   └── shared/
-│   ├── index.html
-│   ├── package.json
-│   ├── package-lock.json
-│   ├── tsconfig.json
-│   ├── nginx.conf
-│   ├── Dockerfile
-│   └── .dockerignore
-├── scripts/verify.sh
-├── compose.yml
-├── .env.example
-├── .gitignore
-└── README.md
-```
-
-### Feature boundaries
-
-| Backend module | Future responsibility |
-|---|---|
-| `link` | Link creation, management, aliases, expiration, caching, and redirects |
-| `auth` | Registration and login |
-| `user` | User data and persistence |
-| `analytics` | Click events and statistics |
-| `security` | JWT verification and authorization |
-| `ratelimit` | Request limits using Redis |
-| `shared` | Common configuration and error handling |
-
-Controllers, services, repositories, entities, and DTOs will be added inside each module when their features are implemented. The frontend follows a similar separation in `features`. The `app` directory contains the entry point, while `shared` is reserved for reusable elements.
-
-## Getting started
-
-Docker Engine with Docker Compose, or Docker Desktop, must be **running**. The first build requires an internet connection to download images and dependencies.
-
-From the repository root:
+Start Docker Desktop, then run from the repository root:
 
 ```bash
-docker compose up --build
-```
-
-Open [http://localhost:8080](http://localhost:8080). To start in the background and wait for health checks:
-
-```bash
+docker compose config --quiet
 docker compose up --build -d --wait --wait-timeout 180
 ```
 
-### Service management
-
-```bash
-# Validate the configuration
-docker compose config --quiet
-
-# Build the images
-docker compose build
-
-# Show service status
-docker compose ps
-
-# Follow service logs
-docker compose logs -f
-
-# Stop and remove containers while preserving the database
-docker compose down
-```
-
-The `postgres-data` volume preserves the database after `down` and after container recreation. The `--volumes` option also deletes the data; do not use it if the data must be retained.
+Open http://localhost:8080. Inspect services with `docker compose ps` and `docker compose logs -f`. Stop them with `docker compose down`, which preserves database data. Do not use `--volumes` when data must be retained.
 
 ## Configuration
 
-The application starts with local defaults without requiring a `.env` file. To customize them, copy `.env.example` to `.env` and edit the values. `.env` is excluded from Git.
+Copy `.env.example` to `.env` to override development defaults. Never commit credentials.
 
-| Compose variable | Default | Purpose |
+| Variable | Default | Purpose |
 |---|---|---|
-| `PUBLIC_PORT` | `8080` | Public Nginx port |
+| `PUBLIC_PORT` | `8080` | Nginx host port |
+| `SHORTENER_PUBLIC_BASE_URL` | `http://localhost:${PUBLIC_PORT}` | Public HTTP/HTTPS origin used in returned links |
 | `POSTGRES_DB` | `shortener` | Database name |
-| `POSTGRES_USER` | `shortener` | PostgreSQL user |
-| `POSTGRES_PASSWORD` | `shortener-local` | Local PostgreSQL password |
+| `POSTGRES_USER` | `shortener` | Database user |
+| `POSTGRES_PASSWORD` | `shortener-local` | Development password |
 
-Default credentials are for local development only. Compose passes `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`, `REDIS_HOST`, and `REDIS_PORT` to the backend. The names `postgres` and `redis` are internal Docker addresses. Future frontend API calls will use relative `/api/v1/*` paths.
+The public base URL must be an HTTP/HTTPS origin without credentials, query, fragment, or a path other than `/`. Invalid configuration fails startup. Outside Compose, the backend defaults to `http://localhost:8080`. Compose passes database and Redis connection settings to the backend.
 
-Flyway is enabled, but there are no application migrations yet. Hibernate does not generate tables. Flyway may create its own schema history table.
+Only `POST /api/v1/links` is public, with CSRF excluded specifically for this method/path. Internal Actuator health is also public. Other endpoints retain HTTP Basic authentication, including Swagger and OpenAPI: the development user is `user`, with a generated password in backend startup logs. This is not an application account system.
 
-Spring Security retains its default configuration. API requests with `Accept: application/json` receive `401`, and Swagger requires authentication. The default user is `user`, with a temporary password generated in the backend logs on each startup. This behavior is not an application account system.
+## Create a link
+
+```http
+POST /api/v1/links
+Content-Type: application/json
+
+{"originalUrl":"https://example.com/a-long-path?query=value#section"}
+```
+
+A successful `201 Created` response is returned only after commit:
+
+```json
+{
+  "originalUrl": "https://example.com/a-long-path?query=value#section",
+  "shortCode": "aB3dE7fG",
+  "shortUrl": "http://localhost:8080/r/aB3dE7fG"
+}
+```
+
+Validation strips surrounding whitespace, requires an absolute HTTP/HTTPS URL with a host, and permits at most 8192 characters after stripping. Localhost, IPv4, IPv6, and private IP destinations are allowed. Internal whitespace, malformed escapes, invalid ports, relative URLs, and other schemes are rejected. Destinations are not fetched or checked for availability; path, query, and fragment are preserved. Missing or null destinations and malformed JSON return `400` without insertion.
+
+Codes use eight random Base62 characters. PostgreSQL enforces uniqueness. Code collisions are retried in separate transactions up to five attempts; other persistence failures and exhausted retries return `503` without reporting success.
+
+Errors have `code`, `message`, and nullable `field`:
+
+```json
+{"code":"INVALID_URL","message":"Inserisci un URL HTTP/HTTPS valido, completo di host, entro 8192 caratteri.","field":"originalUrl"}
+```
+
+Malformed JSON uses `INVALID_REQUEST`; persistence failures use `SERVICE_UNAVAILABLE`. Error messages do not expose database details.
 
 ## Verification
 
-After starting the services:
-
 ```bash
+docker compose build
 bash scripts/verify.sh
 ```
 
-The script uses Docker to verify:
+The build runs Maven unit/API tests and TypeScript/Vite checks. The verification script checks health, React content, anonymous creation through Nginx, invalid input without insertion, protected routes, Actuator blocking, and persisted link data after container recreation. It briefly interrupts services and leaves its test link in the database.
 
-- Backend health, including PostgreSQL and Redis connectivity.
-- The HTML page and the presence of compiled React content.
-- Forwarding of API, redirect, Swagger, and OpenAPI requests to the backend, with `401` expected in the skeleton.
-- Blocking of external access to Actuator.
-- PostgreSQL cluster persistence after container recreation.
-
-Verification recreates all containers, causing a brief interruption. It does not add application tables or data.
-
-The backend build runs Maven `verify`; the frontend build runs TypeScript and Vite. When Testcontainers tests are introduced, the test container will need access to the Docker engine.
-
-To regenerate the lockfile without installing npm on the host:
+With Maven and Java 21 available on the host:
 
 ```bash
-docker run --rm --mount "type=bind,source=$PWD/frontend,target=/workspace" -w /workspace node:22.21.1-alpine npm install --package-lock-only --ignore-scripts
+cd backend
+mvn verify
+mvn -Pintegration verify
 ```
 
-## Planned API contracts
+The `integration` profile adds PostgreSQL Testcontainers tests. Docker 25+ must be running and accessible; these tests deliberately do not run during the image build. Test configuration uses Docker API 1.44 for compatibility with Docker 29; override with `-Dapi.version` if needed. A Docker-hosted runner is also available:
 
-These endpoints **have not been implemented yet**:
+```bash
+bash scripts/test-integration.sh
+```
 
-| Method | Path | Future behavior |
-|---|---|---|
-| `POST` | `/api/v1/links` | Create a short link |
-| `GET` | `/api/v1/links` | List the user's links |
-| `DELETE` | `/api/v1/links/{shortCode}` | Delete a link |
-| `GET` | `/api/v1/links/{shortCode}/stats` | Retrieve link statistics |
-| `POST` | `/api/v1/auth/register` | Register an account |
-| `POST` | `/api/v1/auth/login` | Log in |
-| `GET` | `/r/{shortCode}` | Redirect to the original URL |
+With Node available, run `npm ci` then `npm run build` in `frontend/`. There is no frontend test or development script; browser checks exercise the form through Compose.
 
-The `/r/` prefix separates short links from SPA pages. Nginx already reserves these paths: API and redirect requests do not receive the frontend HTML fallback.
+## Planned APIs
 
-## Roadmap
-
-1. **Core links:** creation, unique Base62 codes, persistence, and `302` redirects.
-2. **Backend foundations:** domain migrations, validation, error handling, tests, and API documentation.
-3. **Performance:** Redis caching with TTL and rate limiting.
-4. **Accounts:** registration, JWT login, link ownership, and custom aliases.
-5. **Analytics:** click events, expiration, and statistics.
-
-Hot reload, CI workflows, public deployment, Kafka, Kubernetes, and advanced monitoring are outside the current skeleton.
+Creation is implemented. Listing and deletion of owned links, statistics, registration/login, and public `302` redirects remain planned. Consult `PRODUCT.md` and `USER_STORIES.md` for decisions and acceptance criteria.

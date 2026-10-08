@@ -20,7 +20,7 @@ The first complete workflow is entering a destination, receiving and copying a f
 
 ## Operating Context
 
-Users interact through a browser. The current interface uses Italian copy and the document language is Italian; the intended service languages remain undecided.
+Users interact through a browser. The current interface uses English copy and the document language is English, as requested by the user.
 
 Development and verification use Docker Compose, with Nginx serving the React/TypeScript frontend and forwarding API and redirect requests to a Java/Spring Boot backend. PostgreSQL provides persistence and Redis is configured for future caching and rate limiting. Public deployment is outside the current implementation scope, despite the intended audience being other users.
 
@@ -28,7 +28,7 @@ Development and verification use Docker Compose, with Nginx serving the React/Ty
 
 ### Current implementation
 
-The repository is an application skeleton: a static React placeholder, Spring Boot entry point, and configured infrastructure. Application endpoints, account flows, link operations, domain migrations, and feature tests have not been implemented. Planned capabilities must not be presented as working features.
+US01 is implemented: an English React form creates anonymous links through `POST /api/v1/links`, validates HTTP/HTTPS destinations, persists new eight-character Base62 codes in PostgreSQL, and displays a complete short URL. Local destinations are allowed and destination availability is not checked. Redirects, accounts, management, one-click copying, and other planned features are not yet implemented. Generated links cannot yet open destinations. Planned capabilities must not be presented as working features.
 
 ### Confirmed product decisions
 
@@ -61,7 +61,7 @@ The current working name is URL Shortener. No further binding brand or voice com
 
 - `README.md`: implementation status, architecture, local setup, API plans, and roadmap.
 - `USER_STORIES.md`: planned user workflows, acceptance criteria, implementation responsibilities, and open decisions. Its account requirement is resolved by this initialization: anonymous creation is allowed; subsequent anonymous-link management is still open.
-- `frontend/src/app/main.tsx`, `frontend/src/app/styles.css`, and `frontend/index.html`: the current placeholder interface and Italian document language.
+- `frontend/src/app/main.tsx`, `frontend/src/app/styles.css`, and `frontend/index.html`: the English URL creation interface, with the selected plum palette and paired form/result workspace.
 - `compose.yml`: configured development infrastructure.
 
 There are no customer testimonials, production usage metrics, performance benchmarks, pricing, or deployment evidence in the reviewed project materials. Future interfaces must not fabricate these.
