@@ -8,15 +8,15 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Locale;
 
 public class RegisterRequest {
-    @NotBlank(message = "Inserisci un indirizzo email.")
-    @Email(message = "Inserisci un indirizzo email valido.")
-    @Size(max = 254, message = "L'email può contenere al massimo 254 caratteri.")
-    @Schema(description = "Email normalizzata con strip e lowercase Locale.ROOT prima della validazione", maxLength = 254, example = "utente@example.com")
+    @NotBlank(message = "Enter an email address.")
+    @Email(message = "Enter a valid email address.")
+    @Size(max = 254, message = "Your email address must not exceed 254 characters.")
+    @Schema(description = "Email normalized with strip and Locale.ROOT lowercase before validation", maxLength = 254, example = "user@example.com")
     private String email;
 
-    @NotNull(message = "Inserisci una password.")
-    @Size(min = 15, max = 128, message = "La password deve contenere da 15 a 128 caratteri.")
-    @Schema(description = "Password preservata senza trimming; lunghezza in unità UTF-16", minLength = 15, maxLength = 128, format = "password", accessMode = Schema.AccessMode.WRITE_ONLY)
+    @NotNull(message = "Enter a password.")
+    @Size(min = 15, max = 128, message = "Your password must contain 15 to 128 characters.")
+    @Schema(description = "Password preserved without trimming; length in UTF-16 code units", minLength = 15, maxLength = 128, format = "password", accessMode = Schema.AccessMode.WRITE_ONLY)
     private String password;
 
     public String getEmail() { return email; }

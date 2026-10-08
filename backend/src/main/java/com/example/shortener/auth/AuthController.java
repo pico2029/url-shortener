@@ -29,15 +29,15 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @Operation(summary = "Accedi", description = "Restituisce un JWT Bearer valido per un'ora.")
-    @ApiResponse(responseCode = "200", description = "Accesso effettuato")
-    @ApiResponse(responseCode = "401", description = "Email o password non corrette")
+    @Operation(summary = "Log in", description = "Returns a Bearer JWT valid for one hour.")
+    @ApiResponse(responseCode = "200", description = "Logged in successfully")
+    @ApiResponse(responseCode = "401", description = "Incorrect email or password")
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         return login.login(request);
     }
 
     @org.springframework.web.bind.annotation.GetMapping("/me")
-    @Operation(summary = "Utente autenticato")
+    @Operation(summary = "Authenticated user")
     public RegisterResponse me(@org.springframework.security.core.annotation.AuthenticationPrincipal
             org.springframework.security.oauth2.jwt.Jwt jwt) {
         try {
@@ -50,15 +50,15 @@ public class AuthController {
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Registra un account", description = "Email normalizzata e univoca; password da 15 a 128 unità UTF-16. Non crea una sessione.")
-    @ApiResponse(responseCode = "201", description = "Account creato senza sessione",
+    @Operation(summary = "Register an account", description = "Normalized, unique email; password of 15 to 128 UTF-16 code units. Does not create a session.")
+    @ApiResponse(responseCode = "201", description = "Account created without a session",
             content = @Content(schema = @Schema(implementation = RegisterResponse.class)))
-    @ApiResponse(responseCode = "400", description = "Dati non validi (VALIDATION_ERROR con fieldErrors) o JSON malformato (INVALID_JSON)",
+    @ApiResponse(responseCode = "400", description = "Invalid data (VALIDATION_ERROR with fieldErrors) or malformed JSON (INVALID_JSON)",
             content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class),
-                    examples = @ExampleObject(value = "{\"status\":400,\"detail\":\"Controlla i campi indicati.\",\"code\":\"VALIDATION_ERROR\",\"fieldErrors\":{\"email\":\"Inserisci un indirizzo email valido.\"}}")))
-    @ApiResponse(responseCode = "409", description = "Email già registrata: EMAIL_ALREADY_REGISTERED",
+                    examples = @ExampleObject(value = "{\"status\":400,\"detail\":\"Check the highlighted fields.\",\"code\":\"VALIDATION_ERROR\",\"fieldErrors\":{\"email\":\"Enter a valid email address.\"}}")))
+    @ApiResponse(responseCode = "409", description = "Email already registered: EMAIL_ALREADY_REGISTERED",
             content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(responseCode = "500", description = "Errore interno: INTERNAL_ERROR",
+    @ApiResponse(responseCode = "500", description = "Internal error: INTERNAL_ERROR",
             content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
     public RegisterResponse register(@Valid @RequestBody RegisterRequest request) {
         return registration.register(request);

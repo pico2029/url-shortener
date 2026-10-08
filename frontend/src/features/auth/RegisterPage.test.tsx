@@ -14,7 +14,7 @@ async function fill(email = 'user@example.com', password = 'una password lunga')
   const user = userEvent.setup();
   await user.type(screen.getByLabelText('Email'), email);
   await user.type(screen.getByLabelText('Password'), password);
-  await user.type(screen.getByLabelText('Conferma password'), password);
+  await user.type(screen.getByLabelText('Confirm password'), password);
   return user;
 }
 
@@ -23,31 +23,31 @@ function response(status: number, body: unknown) {
 }
 
 describe('registrazione', () => {
-  it('non invia password differenti e mostra la navigazione ad Accedi', async () => {
+  it('non invia password differenti e mostra la navigazione ad Log in', async () => {
     render(<RegisterPage />);
     const user = await fill();
-    await user.clear(screen.getByLabelText('Conferma password'));
-    await user.type(screen.getByLabelText('Conferma password'), 'una password diversa');
-    await user.click(screen.getByRole('button', { name: 'Crea account' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Le password devono coincidere.');
-    expect(screen.getByLabelText('Conferma password')).toHaveFocus();
+    await user.clear(screen.getByLabelText('Confirm password'));
+    await user.type(screen.getByLabelText('Confirm password'), 'una password diversa');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Passwords must match.');
+    expect(screen.getByLabelText('Confirm password')).toHaveFocus();
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.getByRole('link', { name: 'Accedi' })).toHaveAttribute('href', '/login');
+    expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login');
   });
 
   it('distingue un account creato da un errore di accesso automatico', async () => {
     fetchMock.mockResolvedValueOnce(response(201, {})).mockRejectedValueOnce(new TypeError('network'));
     render(<RegisterPage />);
     const user = await fill();
-    await user.click(screen.getByRole('button', { name: 'Crea account' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Account creato.');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Account created.');
     expect(navigate).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Crea account' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create account' })).toBeDisabled();
     expect(screen.getByLabelText('Password')).toHaveValue('');
   });
   it('mostra errori accessibili senza inviare dati non validi', async () => {
     render(<RegisterPage />);
-    await userEvent.click(screen.getByRole('button', { name: 'Crea account' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Create account' }));
     expect(screen.getByLabelText('Email')).toHaveFocus();
     expect(screen.getByLabelText('Password')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getAllByRole('alert')).toHaveLength(3);
@@ -59,13 +59,13 @@ describe('registrazione', () => {
       .mockResolvedValueOnce(response(200, session));
     render(<RegisterPage />);
     const user = await fill('USER@EXAMPLE.COM', '  una password lunga  ');
-    await user.click(screen.getByRole('button', { name: 'Crea account' }));
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/dashboard', true));
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/register', expect.objectContaining({
       body: JSON.stringify({ email: 'user@example.com', password: '  una password lunga  ' }),
     }));
     expect(screen.getByLabelText('Password')).toHaveValue('');
-    expect(screen.getByLabelText('Conferma password')).toHaveValue('');
+    expect(screen.getByLabelText('Confirm password')).toHaveValue('');
     expect(JSON.parse(sessionStorage.getItem('shortener.session')!)).toEqual(session);
   });
 
@@ -74,8 +74,8 @@ describe('registrazione', () => {
     fetchMock.mockReturnValue(new Promise(done => { resolve = done; }));
     render(<RegisterPage />);
     const user = await fill();
-    await user.click(screen.getByRole('button', { name: 'Crea account' }));
-    expect(screen.getByRole('button', { name: 'Registrazione in corso…' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    expect(screen.getByRole('button', { name: 'Creating your account…' })).toBeDisabled();
     fireEvent.submit(screen.getByLabelText('Email').closest('form')!);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     fetchMock.mockResolvedValueOnce(response(200, session));
@@ -84,22 +84,22 @@ describe('registrazione', () => {
   });
 
   it('mostra il duplicato mantenendo email e password', async () => {
-    fetchMock.mockResolvedValue(response(409, { code: 'EMAIL_ALREADY_REGISTERED', detail: 'Questa email è già registrata.' }));
+    fetchMock.mockResolvedValue(response(409, { code: 'EMAIL_ALREADY_REGISTERED', detail: 'This email is already registered.' }));
     render(<RegisterPage />);
     const user = await fill();
-    await user.click(screen.getByRole('button', { name: 'Crea account' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Questa email è già registrata.');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('This email is already registered.');
     expect(screen.getByLabelText('Email')).toHaveValue('user@example.com');
     expect(screen.getByLabelText('Email')).toHaveFocus();
     expect(screen.getByLabelText('Password')).toHaveValue('una password lunga');
   });
 
   it('associa gli errori del backend ai campi', async () => {
-    fetchMock.mockResolvedValue(response(400, { code: 'VALIDATION_ERROR', fieldErrors: { email: 'Email non valida.' } }));
+    fetchMock.mockResolvedValue(response(400, { code: 'VALIDATION_ERROR', fieldErrors: { email: 'Invalid email address.' } }));
     render(<RegisterPage />);
     const user = await fill();
-    await user.click(screen.getByRole('button', { name: 'Crea account' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Email non valida.');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email address.');
     expect(screen.getByLabelText('Email')).toHaveAttribute('aria-describedby', 'email-error');
   });
 
@@ -110,11 +110,11 @@ describe('registrazione', () => {
     fetchMock.mockResolvedValueOnce(response(201, {})).mockResolvedValueOnce(response(200, session));
     render(<RegisterPage />);
     const user = await fill();
-    await user.click(screen.getByRole('button', { name: 'Crea account' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Il servizio non è disponibile.');
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Crea account' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The service is unavailable.');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create account' })).toBeEnabled());
     expect(screen.getByLabelText('Email')).toHaveValue('user@example.com');
-    await user.click(screen.getByRole('button', { name: 'Crea account' }));
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/dashboard', true));
   });
 });

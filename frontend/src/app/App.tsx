@@ -35,10 +35,10 @@ function DashboardPage() {
 
   return <main>
     <h1>Dashboard</h1>
-    {status === 'checking' && <p role="status">Verifica dell’accesso…</p>}
+    {status === 'checking' && <p role="status">Checking your session…</p>}
     {status === 'error' && <>
-      <p role="alert">Non è stato possibile verificare l’accesso.</p>
-      <button onClick={() => setAttempt(value => value + 1)}>Riprova</button>
+      <p role="alert">Your session could not be verified.</p>
+      <button onClick={() => setAttempt(value => value + 1)}>Try again</button>
     </>}
   </main>;
 }
@@ -51,7 +51,7 @@ function subscribeNavigation(update: () => void) {
 export function App() {
   const path = useSyncExternalStore(subscribeNavigation, () => window.location.pathname);
   useEffect(() => {
-    document.title = `${path === '/dashboard' ? 'Dashboard' : path === '/login' ? 'Accedi' : path === '/register' ? 'Registrati' : 'Home'} - URL Shortener`;
+    document.title = `${path === '/dashboard' ? 'Dashboard' : path === '/login' ? 'Log in' : path === '/register' ? 'Register' : 'Home'} - URL Shortener`;
   }, [path]);
 
   if (path === '/register') return <AuthForm key="register" mode="register" />;
@@ -60,9 +60,9 @@ export function App() {
   return <>
     <header className="site-header"><div className="page-width">URL Shortener</div></header>
     <main>
-      <nav className="auth-navigation" aria-label="Account" lang="it">
-        <a href="/login">Accedi</a>
-        <a href="/register">Crea un account</a>
+      <nav className="auth-navigation" aria-label="Account" lang="en">
+        <a href="/login">Log in</a>
+        <a href="/register">Create an account</a>
       </nav>
       <header className="page-intro">
         <h1>Shorten a URL</h1>

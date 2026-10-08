@@ -6,11 +6,11 @@ import jakarta.validation.constraints.Size;
 import java.util.Locale;
 
 public class LoginRequest {
-    @NotBlank(message = "Inserisci un indirizzo email.")
-    @Size(max = 254, message = "L'email può contenere al massimo 254 caratteri.")
+    @NotBlank(message = "Enter an email address.")
+    @Size(max = 254, message = "Your email address must not exceed 254 characters.")
     private String email;
-    @NotNull(message = "Inserisci una password.")
-    @Size(min = 1, max = 128, message = "Inserisci una password valida.")
+    @NotNull(message = "Enter a password.")
+    @Size(min = 1, max = 128, message = "Enter a valid password.")
     private String password;
 
     public String getEmail() { return email; }

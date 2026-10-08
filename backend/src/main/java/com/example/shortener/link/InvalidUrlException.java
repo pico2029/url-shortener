@@ -2,6 +2,6 @@ package com.example.shortener.link;
 
 public class InvalidUrlException extends RuntimeException {
     public InvalidUrlException() {
-        super("Inserisci un URL HTTP/HTTPS valido, completo di host, entro 8192 caratteri.");
+        super("Enter a valid HTTP/HTTPS URL with a host, up to 8,192 characters.");
     }
 }

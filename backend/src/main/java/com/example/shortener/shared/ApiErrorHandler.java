@@ -23,12 +23,12 @@ public class ApiErrorHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiError malformedJson() {
-        return new ApiError("INVALID_REQUEST", "La richiesta non è valida.", null);
+        return new ApiError("INVALID_REQUEST", "The request is invalid.", null);
     }
 
     @ExceptionHandler(LinkUnavailableException.class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     public ApiError unavailable() {
-        return new ApiError("SERVICE_UNAVAILABLE", "Impossibile creare il link. Riprova più tardi.", null);
+        return new ApiError("SERVICE_UNAVAILABLE", "Your link could not be created. Please try again later.", null);
     }
 }

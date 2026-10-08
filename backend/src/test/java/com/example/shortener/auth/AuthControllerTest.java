@@ -38,7 +38,7 @@ class AuthControllerTest {
                 .andExpect(status().isInternalServerError())
                 .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
-                .andExpect(jsonPath("$.detail").value("Il servizio non è disponibile. Riprova più tardi."))
+                .andExpect(jsonPath("$.detail").value("The service is unavailable. Please try again later."))
                 .andExpect(jsonPath("$.trace").doesNotExist());
     }
 }

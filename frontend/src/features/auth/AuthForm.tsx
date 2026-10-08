@@ -34,17 +34,17 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
     const normalizedEmail = email.trim().toLowerCase();
     const next: FieldErrors = {};
     if (!normalizedEmail || emailInput.current?.validity.typeMismatch) {
-      next.email = 'Inserisci un indirizzo email valido.';
+      next.email = 'Enter a valid email address.';
     } else if (normalizedEmail.length > 254) {
-      next.email = "L'email può contenere al massimo 254 caratteri.";
+      next.email = 'Your email address must not exceed 254 characters.';
     }
     if (registering && (password.length < 15 || password.length > 128)) {
-      next.password = 'La password deve contenere da 15 a 128 caratteri.';
+      next.password = 'Your password must contain 15 to 128 characters.';
     } else if (!registering && (!password || password.length > 128)) {
-      next.password = 'Inserisci una password valida.';
+      next.password = 'Enter a valid password.';
     }
     if (registering && (!confirmation || confirmation !== password)) {
-      next.confirmPassword = 'Le password devono coincidere.';
+      next.confirmPassword = 'Passwords must match.';
     }
     setErrors(next);
     setMessage('');
@@ -67,15 +67,15 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
         setAccountCreated(true);
         setPassword('');
         setConfirmation('');
-        setMessage('Account creato. Non è stato possibile completare l’accesso automatico: passa ad Accedi e riprova.');
+        setMessage('Account created. Automatic login could not be completed. Go to Log in and try again.');
       } else if (error instanceof ApiError && error.problem.code === 'EMAIL_ALREADY_REGISTERED') {
         setErrors({ email: error.message });
       } else if (error instanceof ApiError && error.problem.code === 'INVALID_CREDENTIALS') {
-        setMessage('Email o password non corrette. Controlla i dati e riprova.');
+        setMessage('Incorrect email or password. Check your details and try again.');
       } else if (error instanceof ApiError && error.problem.fieldErrors) {
         setErrors(error.problem.fieldErrors);
       } else {
-        setMessage('Il servizio non è disponibile. Controlla la connessione e riprova.');
+        setMessage('The service is unavailable. Check your connection and try again.');
       }
     } finally {
       submitting.current = false;
@@ -84,14 +84,14 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   }
 
   return (
-    <main className="registration" lang="it">
-      <a className="back-link" href="/">Torna alla home</a>
+    <main className="registration" lang="en">
+      <a className="back-link" href="/">Back to home</a>
       <nav className="auth-navigation" aria-label="Account">
-        <a href="/login" aria-current={!registering ? 'page' : undefined}>Accedi</a>
-        <a href="/register" aria-current={registering ? 'page' : undefined}>Registrati</a>
+        <a href="/login" aria-current={!registering ? 'page' : undefined}>Log in</a>
+        <a href="/register" aria-current={registering ? 'page' : undefined}>Register</a>
       </nav>
-      <h1>{registering ? 'Crea un account' : 'Accedi'}</h1>
-      <p className="intro">{registering ? 'Inserisci i tuoi dati e conferma la password per registrarti.' : 'Inserisci email e password per entrare nel tuo account.'}</p>
+      <h1>{registering ? 'Create an account' : 'Log in'}</h1>
+      <p className="intro">{registering ? 'Enter your details and confirm your password to create an account.' : 'Enter your email and password to log in.'}</p>
       <form noValidate onSubmit={submit} aria-busy={pending}>
         <div className="field">
           <label htmlFor="email">Email</label>
@@ -107,11 +107,11 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
             value={password} disabled={pending || accountCreated} aria-invalid={Boolean(errors.password)}
             aria-describedby={[registering ? 'password-help' : '', errors.password ? 'password-error' : ''].filter(Boolean).join(' ') || undefined}
             onChange={event => { setPassword(event.target.value); setErrors(current => ({ ...current, password: undefined, confirmPassword: undefined })); }} />
-          {registering && <p className="field-help" id="password-help">Da 15 a 128 caratteri. Puoi usare spazi e simboli; non servono combinazioni particolari.</p>}
+          {registering && <p className="field-help" id="password-help">Use 15 to 128 characters. Spaces and symbols are allowed; no special combinations are required.</p>}
           {errors.password && <p className="field-error" id="password-error" role="alert">{errors.password}</p>}
         </div>
         {registering && <div className="field">
-          <label htmlFor="confirm-password">Conferma password</label>
+          <label htmlFor="confirm-password">Confirm password</label>
           <input ref={confirmationInput} id="confirm-password" name="confirmPassword" type="password" autoComplete="new-password" required
             value={confirmation} disabled={pending || accountCreated} aria-invalid={Boolean(errors.confirmPassword)}
             aria-describedby={errors.confirmPassword ? 'confirmation-error' : undefined}
@@ -120,9 +120,9 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
         </div>}
         {message && <div className="feedback error" role="alert" tabIndex={-1} ref={feedback}>{message}</div>}
         <button type="submit" disabled={pending || accountCreated}>
-          {pending ? (registering ? 'Registrazione in corso…' : 'Accesso in corso…') : (registering ? 'Crea account' : 'Accedi')}
+          {pending ? (registering ? 'Creating your account…' : 'Logging in…') : (registering ? 'Create account' : 'Log in')}
         </button>
-        <p className="submission-status" role="status">{pending ? 'Attendi il completamento dell’operazione.' : ''}</p>
+        <p className="submission-status" role="status">{pending ? 'Please wait for the operation to complete.' : ''}</p>
       </form>
     </main>
   );

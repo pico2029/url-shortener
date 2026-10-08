@@ -9,7 +9,7 @@ The project implements US01 anonymous link creation, US02 public redirects, regi
 | Available | To be implemented |
 |---|---|
 | Link creation, public redirects, registration, login and current-user APIs | Link ownership |
-| English link creation form, Italian account forms and placeholder dashboard | Dashboard content and link management |
+| English link creation, account forms and placeholder dashboard | Dashboard content and link management |
 | PostgreSQL and Redis configuration | Application caching and rate limiting |
 | Flyway users/links migrations and JPA persistence | Remaining domain migrations |
 | Registration, JWT login and session verification | Logout |
@@ -153,8 +153,8 @@ The first build can take several minutes while Docker downloads images and depen
 | Page | Behavior |
 |---|---|
 | [Home](http://localhost:8080/) | Anonymous link creation and links to login and registration |
-| [Accedi](http://localhost:8080/login) | Email/password login for existing accounts |
-| [Registrati](http://localhost:8080/register) | Email, password and matching password confirmation |
+| [Log in](http://localhost:8080/login) | Email/password login for existing accounts |
+| [Register](http://localhost:8080/register) | Email, password and matching password confirmation |
 | [Dashboard](http://localhost:8080/dashboard) | Only the title “Dashboard” after successful session verification; redirects to login without a valid session |
 
 Both successful forms lead to the dashboard. Registration creates an account and then automatically calls login. No link management or logout control is available yet.
@@ -328,7 +328,7 @@ Codes use eight random Base62 characters. PostgreSQL enforces uniqueness. Code c
 Errors have `code`, `message`, and nullable `field`:
 
 ```json
-{"code":"INVALID_URL","message":"Inserisci un URL HTTP/HTTPS valido, completo di host, entro 8192 caratteri.","field":"originalUrl"}
+{"code":"INVALID_URL","message":"Enter a valid HTTP/HTTPS URL with a host, up to 8,192 characters.","field":"originalUrl"}
 ```
 
 Malformed JSON uses `INVALID_REQUEST`; persistence failures use `SERVICE_UNAVAILABLE`. Error messages do not expose database details.
@@ -357,7 +357,7 @@ The HTML error pages are served directly by the backend and work without JavaScr
 
 ## US03 — Registration
 
-Open [http://localhost:8080/register](http://localhost:8080/register), also linked from the home page. The form handles loading, password confirmation, validation, duplicates and network errors. Its Accedi/Registrati navigation connects `/login` and `/register`. After account creation, the frontend calls login automatically, saves the session and opens `/dashboard`. If automatic login fails, it explains that the account was created and asks the user to switch to Accedi, without attempting another registration. No email verification or password recovery is implemented.
+Open [http://localhost:8080/register](http://localhost:8080/register), also linked from the home page. The form handles loading, password confirmation, validation, duplicates and network errors. Its Log in/Register navigation connects `/login` and `/register`. After account creation, the frontend calls login automatically, saves the session and opens `/dashboard`. If automatic login fails, it explains that the account was created and asks the user to switch to Log in, without attempting another registration. No email verification or password recovery is implemented.
 
 ```http
 POST /api/v1/auth/register
@@ -376,7 +376,7 @@ Errors use `application/problem+json`, standard ProblemDetail fields and an addi
 
 | Status | Code | Meaning |
 |---|---|---|
-| 400 | `VALIDATION_ERROR` | Invalid fields; `fieldErrors` maps field names to Italian messages |
+| 400 | `VALIDATION_ERROR` | Invalid fields; `fieldErrors` maps field names to English messages |
 | 400 | `INVALID_JSON` | Missing or malformed JSON |
 | 409 | `EMAIL_ALREADY_REGISTERED` | Normalized email already exists |
 | 500 | `INTERNAL_ERROR` | Generic internal failure without implementation details |
@@ -388,10 +388,10 @@ Example validation response (the `instance` contains the request path):
   "type": "about:blank",
   "title": "Bad Request",
   "status": 400,
-  "detail": "Controlla i campi indicati.",
+  "detail": "Check the highlighted fields.",
   "instance": "/api/v1/auth/register",
   "code": "VALIDATION_ERROR",
-  "fieldErrors": {"password": "La password deve contenere da 15 a 128 caratteri."}
+  "fieldErrors": {"password": "Your password must contain 15 to 128 characters."}
 }
 ```
 
@@ -422,7 +422,7 @@ npm test
 npm run build
 ```
 
-For full verification, run the integration suite above, frontend tests, `docker compose build`, `docker compose up -d --wait --wait-timeout 180`, and `bash scripts/verify.sh`. In the browser, create and open a short link without login, check the missing-code page and its home link, navigation between Accedi and Registrati, mismatched password confirmation, successful registration/login, dashboard refresh, keyboard navigation, and desktop/mobile layouts. A passing application build alone does not verify the browser flow or container persistence. Public deployment remains outside scope.
+For full verification, run the integration suite above, frontend tests, `docker compose build`, `docker compose up -d --wait --wait-timeout 180`, and `bash scripts/verify.sh`. In the browser, create and open a short link without login, check the missing-code page and its home link, navigation between Log in and Register, mismatched password confirmation, successful registration/login, dashboard refresh, keyboard navigation, and desktop/mobile layouts. A passing application build alone does not verify the browser flow or container persistence. Public deployment remains outside scope.
 
 ## Login and dashboard
 

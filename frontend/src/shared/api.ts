@@ -7,7 +7,7 @@ export type ApiProblem = {
 
 export class ApiError extends Error {
   constructor(public readonly problem: ApiProblem) {
-    super(problem.detail || 'Il servizio non è disponibile. Riprova più tardi.');
+    super(problem.detail || 'The service is unavailable. Please try again later.');
   }
 }
 

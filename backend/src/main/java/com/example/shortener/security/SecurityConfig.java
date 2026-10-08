@@ -45,7 +45,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint((request, response, exception) -> {
                             response.setStatus(401);
                             response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-                            mapper.writeValue(response.getOutputStream(), ApiExceptionHandler.problem(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "La sessione non è valida. Accedi nuovamente."));
+                            mapper.writeValue(response.getOutputStream(), ApiExceptionHandler.problem(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Your session is invalid. Please log in again."));
                         }))
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((request, response, exception) -> {
@@ -56,7 +56,7 @@ public class SecurityConfig {
                         .accessDeniedHandler((request, response, exception) -> {
                             response.setStatus(403);
                             response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-                            mapper.writeValue(response.getOutputStream(), ApiExceptionHandler.problem(HttpStatus.FORBIDDEN, "FORBIDDEN", "Richiesta non consentita."));
+                            mapper.writeValue(response.getOutputStream(), ApiExceptionHandler.problem(HttpStatus.FORBIDDEN, "FORBIDDEN", "This request is not allowed."));
                         }))
                 .build();
     }

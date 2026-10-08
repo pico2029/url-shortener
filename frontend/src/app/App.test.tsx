@@ -19,11 +19,11 @@ it('accede e naviga alla pagina con il solo titolo', async () => {
   fetchMock.mockResolvedValueOnce(response(200, session)).mockResolvedValueOnce(response(200, { email: 'user@example.com' }));
   render(<App />);
   const user = userEvent.setup();
-  expect(screen.queryByLabelText('Conferma password')).not.toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Registrati' })).toHaveAttribute('href', '/register');
+  expect(screen.queryByLabelText('Confirm password')).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Register' })).toHaveAttribute('href', '/register');
   await user.type(screen.getByLabelText('Email'), 'USER@EXAMPLE.COM');
   await user.type(screen.getByLabelText('Password'), 'una password lunga');
-  await user.click(screen.getByRole('button', { name: 'Accedi' }));
+  await user.click(screen.getByRole('button', { name: 'Log in' }));
   await waitFor(() => expect(screen.getByRole('main').children).toHaveLength(1));
   expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
   expect(window.location.pathname).toBe('/dashboard');
@@ -36,8 +36,8 @@ it('mostra credenziali errate senza navigare', async () => {
   const user = userEvent.setup();
   await user.type(screen.getByLabelText('Email'), 'user@example.com');
   await user.type(screen.getByLabelText('Password'), 'wrong password');
-  await user.click(screen.getByRole('button', { name: 'Accedi' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Email o password non corrette.');
+  await user.click(screen.getByRole('button', { name: 'Log in' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Incorrect email or password.');
   expect(window.location.pathname).toBe('/login');
   expect(sessionStorage.length).toBe(0);
 });
@@ -59,7 +59,7 @@ it('mantiene la sessione dopo il refresh e mostra solo il titolo', async () => {
   expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
 });
 
-it('rimuove una sessione rifiutata dal server e ritorna ad Accedi', async () => {
+it('rimuove una sessione rifiutata dal server e ritorna ad Log in', async () => {
   saveSession(session);
   window.history.replaceState(null, '', '/dashboard');
   fetchMock.mockResolvedValue(response(401, {}));
