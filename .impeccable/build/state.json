@@ -1,0 +1,95 @@
+{
+  "tool": "build-phase",
+  "version": 2,
+  "startedAt": "2026-10-08T15:31:21.418Z",
+  "comp": null,
+  "direction": "a147c967",
+  "breakpoint": null,
+  "artifact": "frontend/src/app/main.tsx",
+  "phase": "comps",
+  "phases": {
+    "comps": {
+      "status": "open",
+      "openedAt": "2026-10-08T15:31:21.418Z",
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [
+        {
+          "at": "2026-10-08T15:40:56.807Z",
+          "text": "Implementation follows selected plum two-column direction with English user amendment. Measured comp pipeline was not performed: COMPS and later gates remain incomplete; no pixel fidelity or code-led exemption is claimed."
+        }
+      ],
+      "gate": null,
+      "forced": null
+    },
+    "spec": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "plates": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "hero": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "sections": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "motion": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "responsive": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "review": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    }
+  },
+  "finish": {
+    "disposition": "fix",
+    "at": "2026-10-08T15:42:19.659Z",
+    "phaseAtFinish": "comps"
+  },
+  "sessionId": "01a11c02-a1a8-77d2-8f84-97dcc0d4e492"
+}

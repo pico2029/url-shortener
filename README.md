@@ -1,23 +1,23 @@
 # URL Shortener
 
-A URL-shortener project built with a **Java/Spring Boot backend**, a **React/TypeScript frontend**, **PostgreSQL**, and **Redis**. Account registration and login are available; URL shortening is still planned. Builds and services run through **Docker Compose**.
+A URL-shortener project built with a **Java/Spring Boot backend**, a **React/TypeScript frontend**, **PostgreSQL**, and **Redis**. Anonymous short-link creation, account registration and login are available; redirects remain planned. Builds and services run through **Docker Compose**.
 
 ## Project status
 
-The project implements registration and JWT login, with a placeholder dashboard; link features and logout remain planned.
+The project implements US01 anonymous link creation, registration and JWT login, with a placeholder dashboard. Redirects, link management and logout remain planned.
 
 | Available | To be implemented |
 |---|---|
-| Spring Boot registration, login and current-user APIs | Link creation and redirects |
-| React home, registration, login and placeholder dashboard | Dashboard content and link management |
+| Link creation, registration, login and current-user APIs | Redirects |
+| English link creation form, Italian account forms and placeholder dashboard | Dashboard content and link management |
 | PostgreSQL and Redis configuration | Application caching and rate limiting |
-| Flyway users migration and JPA persistence | Link entities and migrations |
+| Flyway users/links migrations and JPA persistence | Remaining domain migrations |
 | Registration, JWT login and session verification | Logout |
 | Authentication endpoint documentation, Swagger UI, and health checks | Documentation for remaining endpoints |
 | Multi-stage Dockerfiles and Docker Compose | Analytics, custom aliases, and expiration |
 | Infrastructure, registration and persistence checks; feature tests | Remaining feature tests |
 
-**Registration and login are implemented:** `/register` includes password confirmation; `/login` checks existing accounts. Both successful flows navigate to `/dashboard`, which currently contains only its title. Registration automatically logs in through the login API. Link features and a logout control remain unimplemented.
+**Registration and login are implemented:** `/register` includes password confirmation; `/login` checks existing accounts. Both successful flows navigate to `/dashboard`, which currently contains only its title. Registration automatically logs in through the login API. Redirects, link management and a logout control remain unimplemented. Generated short URLs can be copied manually but do not yet open destinations.
 
 ## Technology stack
 
@@ -134,7 +134,7 @@ The Dockerfiles use multi-stage builds: Maven/JDK produces the JAR executed by J
 | `ratelimit` | Request limits using Redis |
 | `shared` | Common configuration and error handling |
 
-The `auth`, `user`, `security` and `shared` modules contain the implemented account flow, persistence, JWT configuration and error handling. Other feature modules remain placeholders. The frontend follows a similar separation in `features`: `features/auth` contains the shared login/registration form and session storage; `app` contains routing and the placeholder dashboard; `shared` contains the API client and navigation helper.
+The `link` module contains URL validation, creation and persistence; the `auth`, `user`, `security` and `shared` modules contain the implemented account flow, persistence, JWT configuration and error handling. Other feature modules remain placeholders. The frontend follows a similar separation in `features`: `features/auth` contains the shared login/registration form and session storage; `app` contains routing and the placeholder dashboard; `shared` contains the API client and navigation helper.
 
 ## Getting started
 
@@ -152,7 +152,7 @@ The first build can take several minutes while Docker downloads images and depen
 
 | Page | Behavior |
 |---|---|
-| [Home](http://localhost:8080/) | Entry page with links to login and registration |
+| [Home](http://localhost:8080/) | Anonymous link creation and links to login and registration |
 | [Accedi](http://localhost:8080/login) | Email/password login for existing accounts |
 | [Registrati](http://localhost:8080/register) | Email, password and matching password confirmation |
 | [Dashboard](http://localhost:8080/dashboard) | Only the title “Dashboard” after successful session verification; redirects to login without a valid session |
@@ -225,13 +225,14 @@ The application starts with local defaults without requiring a `.env` file. To c
 | `POSTGRES_DB` | `shortener` | Database name |
 | `POSTGRES_USER` | `shortener` | PostgreSQL user |
 | `POSTGRES_PASSWORD` | `shortener-local` | Local PostgreSQL password |
+| `SHORTENER_PUBLIC_BASE_URL` | `http://localhost:${PUBLIC_PORT}` | Public HTTP/HTTPS origin used in returned short links |
 | `JWT_SECRET` | Empty; a random signing key is generated at startup | Optional Base64-encoded signing secret of at least 32 bytes; retains token validity across backend restarts |
 
 Default credentials are for local development only. Compose passes `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, and `JWT_SECRET` to the backend. The names `postgres` and `redis` are internal Docker addresses. Frontend API calls use relative `/api/v1/*` paths through Nginx.
 
-Flyway applies `V1__create_users.sql` to create the users table and its unique normalized-email constraint. Hibernate does not generate tables. Coordinate migration versions before adding new ones.
+Flyway applies `V1__create_users.sql` for users and `V2__create_links.sql` for links, with unique constraints on email and short code. The merged numbering preserves the local authentication database, which already applied users V1. A database from the separate US01 branch that already recorded links as V1 requires explicit Flyway-history reconciliation before using this merged version; do not delete volumes or blindly repair checksums. Hibernate does not generate tables. Coordinate migration versions before adding new ones.
 
-Spring Security allows anonymous registration, login and the internal health check. Other routes remain protected: unauthenticated GET requests receive JSON `401`; modifying requests without CSRF tokens receive `403`. Registration and login POST requests are exempt from CSRF checks. Form login, HTTP Basic, request caching and the generated demo user are disabled. Protected APIs accept an `Authorization: Bearer <token>` header; Swagger/OpenAPI also remain protected.
+Spring Security allows anonymous link creation (`POST /api/v1/links`), registration, login and the internal health check. Other routes remain protected: unauthenticated GET requests receive JSON `401`; modifying requests without CSRF tokens receive `403`. Link creation, registration and login POST requests are exempt from CSRF checks. Form login, HTTP Basic, request caching and the generated demo user are disabled. Protected APIs accept an `Authorization: Bearer <token>` header; Swagger/OpenAPI also remain protected.
 
 ## Verification
 
@@ -246,11 +247,12 @@ The script uses Docker to verify:
 - Backend health, including PostgreSQL and Redis connectivity.
 - The home, registration, login and dashboard HTML entry points and the presence of compiled React content. Browser interaction is covered separately by frontend tests and manual checks.
 - Forwarding of protected API, redirect, Swagger, and OpenAPI GET requests to the backend, with `401` expected until their features are implemented.
+- Anonymous link creation and invalid URL rejection without insertion.
 - Registration through Nginx (`201`) and duplicate rejection (`409`), using a unique synthetic email per run.
 - Blocking of external access to Actuator.
-- PostgreSQL cluster and registered-account persistence after container recreation.
+- PostgreSQL cluster, link and registered-account persistence after container recreation.
 
-Verification recreates the application containers, causing a brief interruption. Each run leaves one synthetic `verify-<uuid>@example.com` account in the development database; it does not delete existing data or volumes.
+Verification recreates the application containers, causing a brief interruption. Each run leaves a verification link and one synthetic `verify-<uuid>@example.com` account in the development database; it does not delete existing data or volumes.
 
 If `JWT_SECRET` is empty, backend recreation invalidates existing sessions; sign in again afterward. Registered accounts remain in PostgreSQL.
 
@@ -268,6 +270,7 @@ docker run --rm --mount "type=bind,source=$PWD/frontend,target=/workspace" -w /w
 
 | Method | Path | Authentication | Behavior |
 |---|---|---|---|
+| `POST` | `/api/v1/links` | Public | Create and persist a short link |
 | `POST` | `/api/v1/auth/register` | Public | Create an account; return `201` with its public fields |
 | `POST` | `/api/v1/auth/login` | Public | Verify credentials; return `200` with a JWT and expiry |
 | `GET` | `/api/v1/auth/me` | Bearer JWT | Return the authenticated user's public fields |
@@ -280,7 +283,6 @@ These endpoints **have not been implemented yet**:
 
 | Method | Path | Future behavior |
 |---|---|---|
-| `POST` | `/api/v1/links` | Create a short link |
 | `GET` | `/api/v1/links` | List the user's links |
 | `DELETE` | `/api/v1/links/{shortCode}` | Delete a link |
 | `GET` | `/api/v1/links/{shortCode}/stats` | Retrieve link statistics |
@@ -290,13 +292,45 @@ The `/r/` prefix separates short links from SPA pages. Nginx already reserves th
 
 ## Roadmap
 
-1. **Core links:** creation, unique Base62 codes, persistence, and `302` redirects.
+1. **Core links:** creation and persistence are implemented; add public `302` redirects (US02).
 2. **Backend foundations:** extend the existing account migration, validation, error handling, tests and API documentation to link features.
 3. **Performance:** Redis caching with TTL and rate limiting.
 4. **Account management:** add logout, link ownership, dashboard content and custom aliases to the implemented registration/JWT login flow.
 5. **Analytics:** click events, expiration, and statistics.
 
 Hot reload, CI workflows, public deployment, Kafka, Kubernetes, and advanced monitoring are outside the current implementation scope.
+
+## US01 — Create a link
+
+
+```http
+POST /api/v1/links
+Content-Type: application/json
+
+{"originalUrl":"https://example.com/a-long-path?query=value#section"}
+```
+
+A successful `201 Created` response is returned only after commit:
+
+```json
+{
+  "originalUrl": "https://example.com/a-long-path?query=value#section",
+  "shortCode": "aB3dE7fG",
+  "shortUrl": "http://localhost:8080/r/aB3dE7fG"
+}
+```
+
+Validation strips surrounding whitespace, requires an absolute HTTP/HTTPS URL with a host, and permits at most 8192 characters after stripping. Localhost, IPv4, IPv6, and private IP destinations are allowed. Internal whitespace, malformed escapes, invalid ports, relative URLs, and other schemes are rejected. Destinations are not fetched or checked for availability; path, query, and fragment are preserved. Missing or null destinations and malformed JSON return `400` without insertion.
+
+Codes use eight random Base62 characters. PostgreSQL enforces uniqueness. Code collisions are retried in separate transactions up to five attempts; other persistence failures and exhausted retries return `503` without reporting success.
+
+Errors have `code`, `message`, and nullable `field`:
+
+```json
+{"code":"INVALID_URL","message":"Inserisci un URL HTTP/HTTPS valido, completo di host, entro 8192 caratteri.","field":"originalUrl"}
+```
+
+Malformed JSON uses `INVALID_REQUEST`; persistence failures use `SERVICE_UNAVAILABLE`. Error messages do not expose database details.
 
 ## US03 — Registration
 
@@ -351,6 +385,8 @@ docker compose --profile test run --rm backend-tests mvn -B -ntp verify
 # Unit tests and real PostgreSQL integration tests — required for US03
 docker compose --profile test run --rm backend-tests mvn -B -ntp verify -Pintegration
 ```
+
+The integration profile runs both tagged authentication tests through Surefire and link `*IT` tests through Failsafe. `bash scripts/test-integration.sh` is an alternative Docker runner.
 
 The optional `backend-tests` service mounts the backend checkout, a Maven cache and the Docker socket. It uses `host.docker.internal` for Docker Desktop; `extra_hosts` provides the host gateway on Linux. It pins the docker-java API to 1.44 for compatibility with Docker 29; override `DOCKER_API_VERSION` if necessary. Testcontainers creates a separate temporary PostgreSQL instance and removes it afterward; it does not use the application's data volume. The profile is not started with ordinary `docker compose up`.
 

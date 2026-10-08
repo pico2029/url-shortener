@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { CreateLinkForm } from '../features/links/CreateLinkForm';
 import { AuthForm } from '../features/auth/AuthForm';
 import { clearSession, readSession } from '../features/auth/session';
 import { ApiError, getJson } from '../shared/api';
@@ -56,13 +57,25 @@ export function App() {
   if (path === '/register') return <AuthForm key="register" mode="register" />;
   if (path === '/login') return <AuthForm key="login" mode="login" />;
   if (path === '/dashboard') return <DashboardPage />;
-  return <main>
-    <h1>URL Shortener</h1>
-    <p>Struttura del progetto pronta.</p>
-    <p>Le funzionalità di gestione dei link saranno implementate nelle prossime fasi.</p>
-    <nav className="auth-navigation" aria-label="Account">
-      <a href="/login">Accedi</a>
-      <a href="/register">Crea un account</a>
-    </nav>
-  </main>;
+  return <>
+    <header className="site-header"><div className="page-width">URL Shortener</div></header>
+    <main>
+      <nav className="auth-navigation" aria-label="Account" lang="it">
+        <a href="/login">Accedi</a>
+        <a href="/register">Crea un account</a>
+      </nav>
+      <header className="page-intro">
+        <h1>Shorten a URL</h1>
+        <p className="intro">Create a short link. No account needed.</p>
+      </header>
+      <aside className="availability-notice" id="availability-note" aria-label="Service availability">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v6m0 3v.1" />
+        </svg>
+        <p>Links are saved, but redirects are not available yet.</p>
+      </aside>
+      <CreateLinkForm />
+    </main>
+  </>;
 }

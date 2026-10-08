@@ -20,7 +20,7 @@ The first complete workflow is entering a destination, receiving and copying a f
 
 ## Operating Context
 
-Users interact through a browser. The current interface uses Italian copy and the document language is Italian; the intended service languages remain undecided.
+Users interact through a browser. The URL creation page uses the English copy and plum design from US01; the account forms retain their Italian copy. The document language is English and Italian account sections are explicitly marked.
 
 Development and verification use Docker Compose, with Nginx serving the React/TypeScript frontend and forwarding API and redirect requests to a Java/Spring Boot backend. PostgreSQL provides persistence and Redis is configured for future caching and rate limiting. Public deployment is outside the current implementation scope, despite the intended audience being other users.
 
@@ -28,7 +28,7 @@ Development and verification use Docker Compose, with Nginx serving the React/Ty
 
 ### Current implementation
 
-The repository has configured infrastructure, a React home page and registration form, and a Spring Boot registration API. US03 registration is implemented with a public API, PostgreSQL users migration, password hashing, an Italian `/register` form, and backend/frontend feature tests. Login and JWT session verification are implemented; registration includes password confirmation and automatically logs in. Both forms lead to a dashboard showing only its title. Logout, link operations and personal management remain unimplemented. Planned capabilities must not be presented as working features.
+US01 creates anonymous links through an English React form and `POST /api/v1/links`, validates HTTP/HTTPS destinations, persists eight-character Base62 codes in PostgreSQL and displays full short URLs. Local destinations are allowed; availability is not checked. Redirects are not implemented, so generated links cannot yet open their destinations. US03 registration is implemented with a public API, PostgreSQL users migration, password hashing, an Italian `/register` form, and backend/frontend feature tests. Login and JWT session verification are implemented; registration includes password confirmation and automatically logs in. Both forms lead to a dashboard showing only its title. Logout, redirects, link management and personal management remain unimplemented. Planned capabilities must not be presented as working features.
 
 ### Confirmed product decisions
 
@@ -61,7 +61,7 @@ The current working name is URL Shortener. No further binding brand or voice com
 
 - `README.md`: implementation status, architecture, local setup, API plans, and roadmap.
 - `USER_STORIES.md`: planned user workflows, acceptance criteria, implementation responsibilities, and open decisions. Its account requirement is resolved by this initialization: anonymous creation is allowed; subsequent anonymous-link management is still open.
-- `frontend/src/app/main.tsx`, `frontend/src/app/styles.css`, and `frontend/index.html`: the current placeholder interface and Italian document language.
+- `frontend/src/app/main.tsx`, `frontend/src/app/styles.css`, and `frontend/index.html`: the English link-creation interface, Italian account forms, and shared plum palette.
 - `compose.yml`: configured development infrastructure.
 
 There are no customer testimonials, production usage metrics, performance benchmarks, pricing, or deployment evidence in the reviewed project materials. Future interfaces must not fabricate these.

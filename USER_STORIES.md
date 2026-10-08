@@ -2,7 +2,7 @@
 
 ## Stato del progetto
 
-Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard con il solo titolo. Link, logout e gestione personale restano da implementare.
+Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard con il solo titolo. US01 aggiunge creazione anonima di link, validazione HTTP/HTTPS, codici Base62 univoci e persistenza PostgreSQL tramite API e form React. Redirect, logout e gestione personale restano da implementare.
 
 Questo documento definisce il lavoro necessario per realizzare le funzionalità previste nel [README](README.md): link brevi, account, dashboard, alias personalizzati, scadenza, cache, limiti delle richieste e statistiche. Il deployment pubblico resta fuori dal perimetro attuale.
 
@@ -221,6 +221,6 @@ Una User Story è completata quando:
 - La funzionalità è utilizzabile attraverso Docker Compose e il proxy Nginx.
 - L'interfaccia gestisce gli stati di caricamento, successo ed errore applicabili.
 
-Per chiudere il progetto occorre aggiornare anche [scripts/verify.sh](scripts/verify.sh): oggi verifica la pagina provvisoria e si aspetta `401` anche sui redirect. Deve verificare il comportamento dell'app completata e la persistenza dei link dopo la ricreazione dei container.
+Lo script [scripts/verify.sh](scripts/verify.sh) verifica creazione anonima, registrazione e persistenza di link e utenti dopo la ricreazione dei container. I redirect restano protetti e restituiscono `401` fino a US02; aggiornare le verifiche con l'implementazione delle storie successive.
 
 Il progetto è completato quando due utenti possono registrarsi, creare e gestire separatamente i propri link; redirect, alias, scadenze, cache, limiti e statistiche funzionano; i test passano e il README descrive l'app reale.

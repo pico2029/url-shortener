@@ -106,7 +106,7 @@ class RegistrationIntegrationTest {
             mvc.perform(get(path)).andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
         }
-        mvc.perform(post("/api/v1/links").contentType("application/json").content("{}"))
+        mvc.perform(post("/api/v1/other").contentType("application/json").content("{}"))
                 .andExpect(status().isForbidden());
     }
 

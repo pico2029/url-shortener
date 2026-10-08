@@ -84,7 +84,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   }
 
   return (
-    <main className="registration">
+    <main className="registration" lang="it">
       <a className="back-link" href="/">Torna alla home</a>
       <nav className="auth-navigation" aria-label="Account">
         <a href="/login" aria-current={!registering ? 'page' : undefined}>Accedi</a>
