@@ -4,20 +4,20 @@ A URL-shortener project built with a **Java/Spring Boot backend**, a **React/Typ
 
 ## Project status
 
-The project implements US01 anonymous link creation, registration and JWT login, with a placeholder dashboard. Redirects, link management and logout remain planned.
+The project implements US01, US03, US04 and US05: anonymous and authenticated creation, registration, JWT login, client logout and a personal dashboard. Redirects and deletion remain planned.
 
 | Available | To be implemented |
 |---|---|
 | Link creation, registration, login and current-user APIs | Redirects |
-| English link creation form, Italian account forms and placeholder dashboard | Dashboard content and link management |
+| English home, Italian account forms and personal dashboard | Link deletion and automatic copying |
 | PostgreSQL and Redis configuration | Application caching and rate limiting |
 | Flyway users/links migrations and JPA persistence | Remaining domain migrations |
-| Registration, JWT login and session verification | Logout |
+| Registration, JWT login, expiry and client logout | JWT revocation (outside current scope) |
 | Authentication endpoint documentation, Swagger UI, and health checks | Documentation for remaining endpoints |
 | Multi-stage Dockerfiles and Docker Compose | Analytics, custom aliases, and expiration |
 | Infrastructure, registration and persistence checks; feature tests | Remaining feature tests |
 
-**Registration and login are implemented:** `/register` includes password confirmation; `/login` checks existing accounts. Both successful flows navigate to `/dashboard`, which currently contains only its title. Registration automatically logs in through the login API. Redirects, link management and a logout control remain unimplemented. Generated short URLs can be copied manually but do not yet open destinations.
+**Registration and login are implemented:** `/register` includes password confirmation; `/login` checks existing accounts. Both successful flows navigate to `/dashboard`, with authenticated creation, paginated personal links and “Esci”. Registration automatically logs in through the login API. Redirects, deletion, automatic copying, expiration and statistics remain unimplemented. Generated short URLs can be copied manually but do not yet open destinations.
 
 ## Technology stack
 
@@ -134,7 +134,7 @@ The Dockerfiles use multi-stage builds: Maven/JDK produces the JAR executed by J
 | `ratelimit` | Request limits using Redis |
 | `shared` | Common configuration and error handling |
 
-The `link` module contains URL validation, creation and persistence; the `auth`, `user`, `security` and `shared` modules contain the implemented account flow, persistence, JWT configuration and error handling. Other feature modules remain placeholders. The frontend follows a similar separation in `features`: `features/auth` contains the shared login/registration form and session storage; `app` contains routing and the placeholder dashboard; `shared` contains the API client and navigation helper.
+The `link` module contains URL validation, creation and persistence; the `auth`, `user`, `security` and `shared` modules contain the implemented account flow, persistence, JWT configuration and error handling. Other feature modules remain placeholders. The frontend follows a similar separation in `features`: `features/auth` contains the shared login/registration form and session storage; `features/links` contains the reusable creation form and personal dashboard; `app` contains routing; `shared` contains the API client and navigation helper.
 
 ## Getting started
 
@@ -155,9 +155,9 @@ The first build can take several minutes while Docker downloads images and depen
 | [Home](http://localhost:8080/) | Anonymous link creation and links to login and registration |
 | [Accedi](http://localhost:8080/login) | Email/password login for existing accounts |
 | [Registrati](http://localhost:8080/register) | Email, password and matching password confirmation |
-| [Dashboard](http://localhost:8080/dashboard) | Only the title “Dashboard” after successful session verification; redirects to login without a valid session |
+| [Dashboard](http://localhost:8080/dashboard) | Italian creation form, personal paginated list and logout; redirects to login without a valid session |
 
-Both successful forms lead to the dashboard. Registration creates an account and then automatically calls login. No link management or logout control is available yet.
+Both successful forms lead to the dashboard. Registration creates an account and then automatically calls login. The dashboard lists only the current account’s links and provides “Esci”.
 
 ### Subsequent starts without code changes
 
@@ -230,7 +230,7 @@ The application starts with local defaults without requiring a `.env` file. To c
 
 Default credentials are for local development only. Compose passes `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, and `JWT_SECRET` to the backend. The names `postgres` and `redis` are internal Docker addresses. Frontend API calls use relative `/api/v1/*` paths through Nginx.
 
-Flyway applies `V1__create_users.sql` for users and `V2__create_links.sql` for links, with unique constraints on email and short code. The merged numbering preserves the local authentication database, which already applied users V1. A database from the separate US01 branch that already recorded links as V1 requires explicit Flyway-history reconciliation before using this merged version; do not delete volumes or blindly repair checksums. Hibernate does not generate tables. Coordinate migration versions before adding new ones.
+Flyway applies `V1__create_users.sql` for users, `V2__create_links.sql` for links and `V3__add_link_owner.sql` for nullable ownership and a listing index, with unique constraints on email and short code. The merged numbering preserves the local authentication database, which already applied users V1. A database from the separate US01 branch that already recorded links as V1 requires explicit Flyway-history reconciliation before using this merged version; do not delete volumes or blindly repair checksums. Hibernate does not generate tables. Coordinate migration versions before adding new ones.
 
 Spring Security allows anonymous link creation (`POST /api/v1/links`), registration, login and the internal health check. Other routes remain protected: unauthenticated GET requests receive JSON `401`; modifying requests without CSRF tokens receive `403`. Link creation, registration and login POST requests are exempt from CSRF checks. Form login, HTTP Basic, request caching and the generated demo user are disabled. Protected APIs accept an `Authorization: Bearer <token>` header; Swagger/OpenAPI also remain protected.
 
@@ -250,9 +250,10 @@ The script uses Docker to verify:
 - Anonymous link creation and invalid URL rejection without insertion.
 - Registration through Nginx (`201`) and duplicate rejection (`409`), using a unique synthetic email per run.
 - Blocking of external access to Actuator.
+- Isolation of two authenticated accounts, excluding anonymous links, before and after container recreation; fresh login after restart.
 - PostgreSQL cluster, link and registered-account persistence after container recreation.
 
-Verification recreates the application containers, causing a brief interruption. Each run leaves a verification link and one synthetic `verify-<uuid>@example.com` account in the development database; it does not delete existing data or volumes.
+Verification recreates the application containers, causing a brief interruption. Each run leaves an anonymous verification link, two personal links and two synthetic `verify-<uuid>-a/b@example.com` accounts in the development database; it does not delete existing data or volumes.
 
 If `JWT_SECRET` is empty, backend recreation invalidates existing sessions; sign in again afterward. Registered accounts remain in PostgreSQL.
 
@@ -270,7 +271,8 @@ docker run --rm --mount "type=bind,source=$PWD/frontend,target=/workspace" -w /w
 
 | Method | Path | Authentication | Behavior |
 |---|---|---|---|
-| `POST` | `/api/v1/links` | Public | Create and persist a short link |
+| `POST` | `/api/v1/links` | Optional Bearer JWT | Create an anonymous or personal link |
+| `GET` | `/api/v1/links?page=0&size=20` | Bearer JWT | List only the current user’s links |
 | `POST` | `/api/v1/auth/register` | Public | Create an account; return `201` with its public fields |
 | `POST` | `/api/v1/auth/login` | Public | Verify credentials; return `200` with a JWT and expiry |
 | `GET` | `/api/v1/auth/me` | Bearer JWT | Return the authenticated user's public fields |
@@ -283,7 +285,6 @@ These endpoints **have not been implemented yet**:
 
 | Method | Path | Future behavior |
 |---|---|---|
-| `GET` | `/api/v1/links` | List the user's links |
 | `DELETE` | `/api/v1/links/{shortCode}` | Delete a link |
 | `GET` | `/api/v1/links/{shortCode}/stats` | Retrieve link statistics |
 | `GET` | `/r/{shortCode}` | Redirect to the original URL |
@@ -295,7 +296,7 @@ The `/r/` prefix separates short links from SPA pages. Nginx already reserves th
 1. **Core links:** creation and persistence are implemented; add public `302` redirects (US02).
 2. **Backend foundations:** extend the existing account migration, validation, error handling, tests and API documentation to link features.
 3. **Performance:** Redis caching with TTL and rate limiting.
-4. **Account management:** add logout, link ownership, dashboard content and custom aliases to the implemented registration/JWT login flow.
+4. **Account management:** add custom aliases and deletion to the implemented personal dashboard.
 5. **Analytics:** click events, expiration, and statistics.
 
 Hot reload, CI workflows, public deployment, Kafka, Kubernetes, and advanced monitoring are outside the current implementation scope.
@@ -382,7 +383,7 @@ Without host Maven, use the dedicated runner from the repository root:
 # Unit tests only, also run during the backend image build
 docker compose --profile test run --rm backend-tests mvn -B -ntp verify
 
-# Unit tests and real PostgreSQL integration tests — required for US03
+# Unit tests and real PostgreSQL integration tests — required for account and link features
 docker compose --profile test run --rm backend-tests mvn -B -ntp verify -Pintegration
 ```
 
@@ -407,6 +408,34 @@ For full verification, run the integration suite above, frontend tests, `docker 
 
 A successful response (`200`) contains `accessToken`, `tokenType: "Bearer"`, and `expiresAt` in UTC. The token is signed with HS256, identifies the user by UUID, has issuer `url-shortener`, and expires after one hour. No cookie is created. The frontend stores the token in per-tab `sessionStorage`, preserves it across refreshes, and sends it as a Bearer header to `GET /api/v1/auth/me`. That endpoint returns only `id`, `email`, and `createdAt`. A missing, invalid or expired session redirects the dashboard to `/login`; transient verification failures allow a retry without deleting the session.
 
-`/dashboard` currently renders only the heading “Dashboard” after the session has been verified. Link management and the logout interface are not implemented yet.
+`/dashboard` shows an Italian creation form, the current user’s links and “Esci”. Logout clears per-tab storage, aborts requests and replaces the current history entry with `/login`. Refresh and back navigation recheck access. Expired or rejected sessions return to login with an explanation; network errors offer retry while retaining the session. Late responses cannot invalidate a newer login. Logout is client-side: no revocation endpoint or JWT blacklist is provided.
 
 `JWT_SECRET` is optional for local development: set it to the Base64 encoding of at least 32 random bytes to retain token validity across backend restarts. For example, generate a value with `openssl rand -base64 32` and keep it in the ignored `.env` file. If empty, a random key is generated at startup, so restarting the backend invalidates existing tokens; accounts remain persisted. Never commit an actual signing secret. The `.env.example` and Compose configuration include this variable.
+
+## US05 — Personal links
+
+`POST /api/v1/links` keeps the US01 request and response. Without a Bearer token it creates an anonymous link; with a valid token it uses only the token subject as owner and checks that the user exists. Invalid, expired and unknown-user tokens return `401` without creating an anonymous fallback. Client-supplied owner fields do not determine ownership. Existing links retain `owner_id = NULL` and cannot be claimed by signing in.
+
+```http
+GET /api/v1/links?page=0&size=20
+Authorization: Bearer <accessToken>
+```
+
+```json
+{
+  "items": [{
+    "originalUrl": "https://example.com/page",
+    "shortCode": "aB3dE7fG",
+    "shortUrl": "http://localhost:8080/r/aB3dE7fG",
+    "createdAt": "2026-10-08T10:00:00Z",
+    "status": "SAVED"
+  }],
+  "page": 0, "size": 20, "totalElements": 1, "totalPages": 1
+}
+```
+
+Pages start at zero; size defaults to 20 and accepts 1–100. Negative pages, non-integer parameters, invalid sizes and unsupported parameters (including `userId`) return `400 INVALID_REQUEST`. Results are ordered by `created_at DESC, id DESC`. An empty or out-of-range page returns `200` with an empty `items` array. Authentication failures return `401 UNAUTHORIZED`; unavailable persistence returns `503 SERVICE_UNAVAILABLE`. Link errors use `{code, message, field}` with no SQL details. OpenAPI documents both link operations and Bearer authentication.
+
+The dashboard translates `SAVED` as “Salvato”, localizes dates in Italian, and displays selectable short URLs without presenting them as working redirects. Creation returns to the first page and refreshes the list. A failed refresh explicitly confirms that creation succeeded and offers retry. Home copy remains English; when a session is present its creation request also sends the JWT, without retrying as anonymous.
+
+Integration tests cover legacy-data migration, owner preservation across code collisions, account isolation, pagination and ordering. Frontend tests cover expiry, refresh, logout/history protection, stale responses, cancellation, loading, retry and refresh after creation.

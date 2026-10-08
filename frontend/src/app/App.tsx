@@ -1,47 +1,7 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { CreateLinkForm } from '../features/links/CreateLinkForm';
 import { AuthForm } from '../features/auth/AuthForm';
-import { clearSession, readSession } from '../features/auth/session';
-import { ApiError, getJson } from '../shared/api';
-import { navigate } from '../shared/navigation';
-
-function DashboardPage() {
-  const [status, setStatus] = useState<'checking' | 'ready' | 'error'>('checking');
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let active = true;
-    const session = readSession();
-    if (!session) {
-      navigate('/login', true);
-      return;
-    }
-    const expiry = window.setTimeout(() => {
-      clearSession();
-      navigate('/login', true);
-    }, Math.max(0, Date.parse(session.expiresAt) - Date.now()));
-    setStatus('checking');
-    getJson('/api/v1/auth/me', session.accessToken).then(() => {
-      if (active) setStatus('ready');
-    }).catch(error => {
-      if (!active) return;
-      if (error instanceof ApiError && error.problem.status === 401) {
-        clearSession();
-        navigate('/login', true);
-      } else setStatus('error');
-    });
-    return () => { active = false; window.clearTimeout(expiry); };
-  }, [attempt]);
-
-  return <main>
-    <h1>Dashboard</h1>
-    {status === 'checking' && <p role="status">Verifica dell’accesso…</p>}
-    {status === 'error' && <>
-      <p role="alert">Non è stato possibile verificare l’accesso.</p>
-      <button onClick={() => setAttempt(value => value + 1)}>Riprova</button>
-    </>}
-  </main>;
-}
+import { DashboardPage } from '../features/links/DashboardPage';
 
 function subscribeNavigation(update: () => void) {
   window.addEventListener('popstate', update);

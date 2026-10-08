@@ -2,7 +2,7 @@
 
 ## Stato del progetto
 
-Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard con il solo titolo. US01 aggiunge creazione anonima di link, validazione HTTP/HTTPS, codici Base62 univoci e persistenza PostgreSQL tramite API e form React. Redirect, logout e gestione personale restano da implementare.
+Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard italiana con creazione autenticata, elenco personale paginato e pulsante Esci. US01 aggiunge creazione anonima di link, validazione HTTP/HTTPS, codici Base62 univoci e persistenza PostgreSQL tramite API e form React. US04 e US05 includono logout locale, scadenza della sessione e isolamento dei link per proprietario. Redirect, copia con un clic, eliminazione e statistiche restano da implementare.
 
 Questo documento definisce il lavoro necessario per realizzare le funzionalità previste nel [README](README.md): link brevi, account, dashboard, alias personalizzati, scadenza, cache, limiti delle richieste e statistiche. Il deployment pubblico resta fuori dal perimetro attuale.
 
@@ -75,6 +75,8 @@ Criteri di accettazione:
 
 ### US04 — Accedere e uscire
 
+**Implementata:** logout locale, annullamento richieste, verifica server, scadenza e protezione da risposte tardive.
+
 **Come utente registrato, voglio accedere al mio account e uscire dalla sessione, per utilizzare le funzionalità personali.**
 
 Responsabile: P2.
@@ -87,6 +89,8 @@ Criteri di accettazione:
 - Il logout rimuove la sessione dal client.
 
 ### US05 — Visualizzare i propri link
+
+**Implementata:** proprietà derivata dal JWT, migrazione V3 senza assegnare i link anonimi, elenco paginato e dashboard italiana. Stato attuale `SAVED` (“Salvato”), senza redirect.
 
 **Come utente autenticato, voglio vedere i link che ho creato, per consultarli e gestirli.**
 
@@ -221,6 +225,6 @@ Una User Story è completata quando:
 - La funzionalità è utilizzabile attraverso Docker Compose e il proxy Nginx.
 - L'interfaccia gestisce gli stati di caricamento, successo ed errore applicabili.
 
-Lo script [scripts/verify.sh](scripts/verify.sh) verifica creazione anonima, registrazione e persistenza di link e utenti dopo la ricreazione dei container. I redirect restano protetti e restituiscono `401` fino a US02; aggiornare le verifiche con l'implementazione delle storie successive.
+Lo script [scripts/verify.sh](scripts/verify.sh) verifica creazione anonima, registrazione, login, isolamento di due account e persistenza di link e utenti dopo la ricreazione dei container. I redirect restano protetti e restituiscono `401` fino a US02; aggiornare le verifiche con l'implementazione delle storie successive.
 
 Il progetto è completato quando due utenti possono registrarsi, creare e gestire separatamente i propri link; redirect, alias, scadenze, cache, limiti e statistiche funzionano; i test passano e il README descrive l'app reale.

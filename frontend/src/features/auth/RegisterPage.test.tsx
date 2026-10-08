@@ -66,7 +66,7 @@ describe('registrazione', () => {
     }));
     expect(screen.getByLabelText('Password')).toHaveValue('');
     expect(screen.getByLabelText('Conferma password')).toHaveValue('');
-    expect(JSON.parse(sessionStorage.getItem('shortener.session')!)).toEqual(session);
+    expect(JSON.parse(sessionStorage.getItem('shortener.session')!)).toMatchObject(session);
   });
 
   it('impedisce invii ripetuti mentre la richiesta è in corso', async () => {

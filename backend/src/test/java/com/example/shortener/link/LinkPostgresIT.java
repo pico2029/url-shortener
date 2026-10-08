@@ -25,6 +25,7 @@ class LinkPostgresIT {
     @Container @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17.6-alpine");
     @Autowired private LinkService service;
+    @Autowired private com.example.shortener.user.UserRepository users;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private MockMvc mvc;
     @MockitoSpyBean private ShortCodeGenerator generator;
@@ -33,7 +34,10 @@ class LinkPostgresIT {
     void migrationPersistenceAndRealUniqueConstraintRetry() {
         doReturn("AAAAAAAA", "AAAAAAAA", "BBBBBBBB").when(generator).generate();
         var first = service.create("https://example.com/path?q=one#fragment");
-        var second = service.create("https://example.com/path?q=one#fragment");
+        var owner = users.saveAndFlush(new com.example.shortener.user.User("retry-owner@example.com", "unused"));
+        var second = service.create("https://example.com/path?q=one#fragment", owner.getId());
+        assertEquals(owner.getId(), jdbc.queryForObject("SELECT owner_id FROM links WHERE short_code = 'BBBBBBBB'", java.util.UUID.class));
+        assertNull(jdbc.queryForObject("SELECT owner_id FROM links WHERE short_code = 'AAAAAAAA'", java.util.UUID.class));
         assertNotEquals(first.shortCode(), second.shortCode());
         assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM links WHERE short_code IN ('AAAAAAAA','BBBBBBBB')", Integer.class));
         assertEquals(first.originalUrl(), jdbc.queryForObject("SELECT original_url FROM links WHERE short_code = 'AAAAAAAA'", String.class));

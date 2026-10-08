@@ -100,3 +100,20 @@ a:hover { color: var(--color-plum-hover); }
 @media (max-width: 480px) {
   .registration button { width: 100%; }
 }
+
+.dashboard-heading { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin-bottom: 2.5rem; }
+.dashboard-heading h1 { margin: 0; }
+.personal-links { border-top: 1px solid var(--color-line); margin-top: 3rem; padding-top: 2rem; }
+.link-list { list-style: none; margin: 0; padding: 0; }
+.link-list li { padding-block: 1.5rem; border-bottom: 1px solid var(--color-line); }
+.link-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 1.5rem; margin-bottom: 1rem; color: var(--color-muted); font-size: 0.95rem; }
+.link-meta .saved-status { margin: 0; }
+.link-list label { margin-bottom: 0.5rem; }
+.link-destination { overflow-wrap: anywhere; line-height: 1.5; }
+.pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem; }
+.pagination button:disabled { cursor: default; }
+@media (max-width: 480px) {
+  .dashboard-heading { align-items: flex-start; }
+  .dashboard-heading h1 { font-size: 2rem; }
+  .pagination span { flex-basis: 100%; order: -1; }
+}

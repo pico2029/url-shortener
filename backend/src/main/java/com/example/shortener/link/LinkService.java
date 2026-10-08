@@ -1,6 +1,10 @@
 package com.example.shortener.link;
 
 import java.sql.SQLException;
+import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.annotation.Transactional;
+import com.example.shortener.auth.InvalidCredentialsException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -27,11 +31,29 @@ public class LinkService {
     }
 
     public CreateLinkResponse create(String originalUrl) {
+        return create(originalUrl, null);
+    }
+
+    @Transactional(readOnly = true)
+    public LinkPageResponse list(UUID ownerId, int page, int size) {
+        if (ownerId == null) throw new InvalidCredentialsException();
+        if (page < 0 || size < 1 || size > 100) throw new InvalidPageException();
+        try {
+            var result = repository.findByOwnerIdOrderByCreatedAtDescIdDesc(ownerId, PageRequest.of(page, size));
+            var items = result.getContent().stream().map(link -> new LinkListItem(link.getOriginalUrl(),
+                    link.getShortCode(), properties.shortUrl(link.getShortCode()), link.getCreatedAt(), "SAVED")).toList();
+            return new LinkPageResponse(items, page, size, result.getTotalElements(), result.getTotalPages());
+        } catch (DataAccessException exception) {
+            throw new LinkUnavailableException(exception);
+        }
+    }
+
+    public CreateLinkResponse create(String originalUrl, UUID ownerId) {
         String url = validator.validate(originalUrl);
         for (int attempt = 0; attempt < 5; attempt++) {
             String code = generator.generate();
             try {
-                transaction.executeWithoutResult(status -> repository.saveAndFlush(new Link(url, code)));
+                transaction.executeWithoutResult(status -> repository.saveAndFlush(new Link(url, code, ownerId)));
                 return new CreateLinkResponse(url, code, properties.shortUrl(code));
             } catch (DataAccessException | TransactionException exception) {
                 if (!isCodeCollision(exception) || attempt == 4) {

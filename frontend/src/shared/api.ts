@@ -11,24 +11,31 @@ export class ApiError extends Error {
   }
 }
 
-export async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(body),
-  });
+export async function requestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(path, options);
   if (!response.ok) {
-    const problem = await response.json().catch(() => ({})) as ApiProblem;
-    throw new ApiError({ ...problem, status: response.status });
+    const body: unknown = await response.json().catch(() => null);
+    const problem: ApiProblem = { status: response.status };
+    if (body && typeof body === 'object') {
+      if ('code' in body && typeof body.code === 'string') problem.code = body.code;
+      if ('detail' in body && typeof body.detail === 'string') problem.detail = body.detail;
+      if ('fieldErrors' in body && body.fieldErrors && typeof body.fieldErrors === 'object') {
+        problem.fieldErrors = Object.fromEntries(Object.entries(body.fieldErrors).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+      }
+    }
+    throw new ApiError(problem);
   }
   return response.json() as Promise<T>;
 }
 
-export async function getJson<T>(path: string, token: string): Promise<T> {
-  const response = await fetch(path, { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } });
-  if (!response.ok) {
-    const problem = await response.json().catch(() => ({})) as ApiProblem;
-    throw new ApiError({ ...problem, status: response.status });
-  }
-  return response.json() as Promise<T>;
+export function postJson<T>(path: string, body: unknown): Promise<T> {
+  return requestJson<T>(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export function getJson<T>(path: string, token: string, signal?: AbortSignal): Promise<T> {
+  return requestJson<T>(path, { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` }, signal });
 }

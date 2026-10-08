@@ -1,6 +1,9 @@
 package com.example.shortener.security;
 
 import com.example.shortener.shared.ApiExceptionHandler;
+import com.example.shortener.shared.ApiErrorHandler.ApiError;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 import org.springframework.context.annotation.Bean;
@@ -19,6 +22,17 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
 
 @Configuration
 public class SecurityConfig {
+    private void writeUnauthorized(String path, HttpServletResponse response, ObjectMapper mapper) throws IOException {
+        if (path.equals("/api/v1/links")) {
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            mapper.writeValue(response.getOutputStream(), new ApiError(
+                    "UNAUTHORIZED", "La sessione non è valida. Accedi nuovamente.", null));
+        } else {
+            mapper.writeValue(response.getOutputStream(), ApiExceptionHandler.problem(HttpStatus.UNAUTHORIZED,
+                    "UNAUTHORIZED", "La sessione non è valida. Accedi nuovamente."));
+        }
+    }
+
     @Bean
     PasswordEncoder passwordEncoder() {
         String id = "pbkdf2@SpringSecurity_v5_8";
@@ -43,13 +57,13 @@ public class SecurityConfig {
                         .authenticationEntryPoint((request, response, exception) -> {
                             response.setStatus(401);
                             response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-                            mapper.writeValue(response.getOutputStream(), ApiExceptionHandler.problem(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "La sessione non è valida. Accedi nuovamente."));
+                            writeUnauthorized(request.getRequestURI(), response, mapper);
                         }))
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((request, response, exception) -> {
                             response.setStatus(401);
                             response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-                            mapper.writeValue(response.getOutputStream(), ApiExceptionHandler.problem(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "È necessario accedere."));
+                            writeUnauthorized(request.getRequestURI(), response, mapper);
                         })
                         .accessDeniedHandler((request, response, exception) -> {
                             response.setStatus(403);

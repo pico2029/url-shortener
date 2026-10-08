@@ -6,6 +6,7 @@ import { saveSession } from '../features/auth/session';
 
 const fetchMock = vi.fn();
 const session = { accessToken: 'signed-token', tokenType: 'Bearer', expiresAt: new Date(Date.now() + 3600000).toISOString() };
+const emptyPage = { items: [], page: 0, size: 20, totalElements: 0, totalPages: 0 };
 const response = (status: number, body: unknown) => ({ ok: status < 400, status, json: async () => body });
 beforeEach(() => {
   fetchMock.mockReset();
@@ -15,8 +16,8 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-it('accede e naviga alla pagina con il solo titolo', async () => {
-  fetchMock.mockResolvedValueOnce(response(200, session)).mockResolvedValueOnce(response(200, { email: 'user@example.com' }));
+it('accede e naviga alla dashboard personale', async () => {
+  fetchMock.mockResolvedValueOnce(response(200, session)).mockResolvedValueOnce(response(200, { email: 'user@example.com' })).mockResolvedValueOnce(response(200, emptyPage));
   render(<App />);
   const user = userEvent.setup();
   expect(screen.queryByLabelText('Conferma password')).not.toBeInTheDocument();
@@ -24,10 +25,10 @@ it('accede e naviga alla pagina con il solo titolo', async () => {
   await user.type(screen.getByLabelText('Email'), 'USER@EXAMPLE.COM');
   await user.type(screen.getByLabelText('Password'), 'una password lunga');
   await user.click(screen.getByRole('button', { name: 'Accedi' }));
-  await waitFor(() => expect(screen.getByRole('main').children).toHaveLength(1));
+  await screen.findByText('Non hai ancora creato link personali. Inizia dal form qui sopra.');
   expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
   expect(window.location.pathname).toBe('/dashboard');
-  expect(fetchMock).toHaveBeenLastCalledWith('/api/v1/auth/me', expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer signed-token' }) }));
+  expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/me', expect.objectContaining({ headers: expect.objectContaining({ authorization: 'Bearer signed-token' }) }));
 });
 
 it('mostra credenziali errate senza navigare', async () => {
@@ -50,12 +51,12 @@ it('blocca la dashboard senza sessione', async () => {
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-it('mantiene la sessione dopo il refresh e mostra solo il titolo', async () => {
+it('mantiene la sessione dopo il refresh e mostra i link personali', async () => {
   saveSession(session);
   window.history.replaceState(null, '', '/dashboard');
-  fetchMock.mockResolvedValue(response(200, {}));
+  fetchMock.mockResolvedValueOnce(response(200, {})).mockResolvedValueOnce(response(200, emptyPage));
   render(<App />);
-  await waitFor(() => expect(screen.getByRole('main').children).toHaveLength(1));
+  await screen.findByText('Non hai ancora creato link personali. Inizia dal form qui sopra.');
   expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
 });
 
