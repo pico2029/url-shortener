@@ -51,7 +51,7 @@ function subscribeNavigation(update: () => void) {
 export function App() {
   const path = useSyncExternalStore(subscribeNavigation, () => window.location.pathname);
   useEffect(() => {
-    document.title = `${path === '/dashboard' ? 'Dashboard' : path === '/login' ? 'Accedi' : path === '/register' ? 'Registrati' : 'Home'} — URL Shortener`;
+    document.title = `${path === '/dashboard' ? 'Dashboard' : path === '/login' ? 'Accedi' : path === '/register' ? 'Registrati' : 'Home'} - URL Shortener`;
   }, [path]);
 
   if (path === '/register') return <AuthForm key="register" mode="register" />;
