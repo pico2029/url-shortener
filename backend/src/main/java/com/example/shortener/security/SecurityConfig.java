@@ -36,6 +36,8 @@ public class SecurityConfig {
                         PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/v1/auth/login"),
                         PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/v1/links")))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.GET, "/r/{shortCode}").permitAll()
+                        .requestMatchers(HttpMethod.HEAD, "/r/{shortCode}").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/links").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
                         .anyRequest().authenticated())

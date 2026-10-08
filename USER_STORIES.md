@@ -2,7 +2,7 @@
 
 ## Stato del progetto
 
-Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard con il solo titolo. US01 aggiunge creazione anonima di link, validazione HTTP/HTTPS, codici Base62 univoci e persistenza PostgreSQL tramite API e form React. Redirect, logout e gestione personale restano da implementare.
+Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard con il solo titolo. US01 aggiunge creazione anonima di link, validazione HTTP/HTTPS, codici Base62 univoci e persistenza PostgreSQL tramite API e form React. US02 aggiunge redirect pubblici `302` e pagine HTML inglesi per codici inesistenti (`404`) e indisponibilità della persistenza (`503`). Logout e gestione personale restano da implementare.
 
 Questo documento definisce il lavoro necessario per realizzare le funzionalità previste nel [README](README.md): link brevi, account, dashboard, alias personalizzati, scadenza, cache, limiti delle richieste e statistiche. Il deployment pubblico resta fuori dal perimetro attuale.
 
@@ -49,6 +49,8 @@ Criteri di accettazione:
 - Segnala gli URL non validi senza creare un link.
 
 ### US02 — Aprire un link breve
+
+Implementata: `GET` e `HEAD /r/{shortCode}` pubblici, ricerca esatta e sensibile alle maiuscole su PostgreSQL, `Location` con destinazione originale e `Cache-Control: no-store`. Nessuna cache, statistica o scadenza anticipata. Gli errori `404` e `503` restituiscono pagine HTML inglesi accessibili senza JavaScript. Parametri aggiunti al link breve non vengono trasferiti alla destinazione.
 
 **Come visitatore, voglio aprire un link breve, per raggiungere la pagina originale.**
 
@@ -221,6 +223,6 @@ Una User Story è completata quando:
 - La funzionalità è utilizzabile attraverso Docker Compose e il proxy Nginx.
 - L'interfaccia gestisce gli stati di caricamento, successo ed errore applicabili.
 
-Lo script [scripts/verify.sh](scripts/verify.sh) verifica creazione anonima, registrazione e persistenza di link e utenti dopo la ricreazione dei container. I redirect restano protetti e restituiscono `401` fino a US02; aggiornare le verifiche con l'implementazione delle storie successive.
+Lo script [scripts/verify.sh](scripts/verify.sh) verifica creazione anonima, redirect pubblici `302`, pagina `404`, registrazione e persistenza di link e utenti dopo la ricreazione dei container, inclusa l'apertura del link persistito. Le API private e Swagger/OpenAPI continuano a restituire `401` senza autenticazione; aggiornare le verifiche con l'implementazione delle storie successive.
 
 Il progetto è completato quando due utenti possono registrarsi, creare e gestire separatamente i propri link; redirect, alias, scadenze, cache, limiti e statistiche funzionano; i test passano e il README descrive l'app reale.

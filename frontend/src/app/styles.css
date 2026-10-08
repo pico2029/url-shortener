@@ -15,8 +15,6 @@
   --color-ink: #2e2536;
   --color-muted: #66576f;
   --color-line: #d1c6db;
-  --color-warning-bg: #fff0cc;
-  --color-warning-ink: #855200;
   --color-error: #a12636;
   --color-success: #315d49;
   --page-width: 70rem;
@@ -37,9 +35,6 @@ main { padding-top: clamp(2.5rem, 5vw, 4.5rem); padding-bottom: 4rem; }
 .page-intro { margin-bottom: 1.75rem; }
 h1 { font-size: clamp(2.25rem, 4vw, 3rem); font-weight: 700; line-height: 1.12; letter-spacing: -0.025em; margin: 0 0 0.8rem; }
 .intro { font-size: 1.25rem; line-height: 1.5; margin: 0; color: var(--color-muted); }
-.availability-notice { display: flex; align-items: center; gap: 1rem; padding: 1.1rem 1.35rem; border-radius: 0.5rem; color: var(--color-warning-ink); background: var(--color-warning-bg); }
-.availability-notice p { margin: 0; line-height: 1.5; }
-.availability-notice svg { width: 1.6rem; height: 1.6rem; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
 .link-workspace { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); margin-top: 3rem; gap: 2.25rem; align-items: start; }
 form { min-width: 0; padding-block: 0.25rem; }
 label { display: block; font-weight: 650; font-size: 1rem; }

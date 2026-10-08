@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-US01 provides anonymous link creation and an English React form. Registration, JWT login and a placeholder dashboard are also implemented; redirects, logout and link management remain planned. Consult `README.md` for current behavior, `PRODUCT.md` for product decisions, and `USER_STORIES.md` for planned work.
+US01 provides anonymous link creation and an English React form. US02 adds public 302 redirects and English HTML pages for missing links (404) and persistence failures (503). Registration, JWT login and a placeholder dashboard are also implemented; logout and link management remain planned. Consult `README.md` for current behavior, `PRODUCT.md` for product decisions, and `USER_STORIES.md` for planned work.
 
 - `backend/`: Java 21/Spring Boot application. Organize code under `src/main/java/com/example/shortener/` by feature (`link`, `auth`, `user`, `analytics`, `security`, `ratelimit`); reserve `shared` for common code. Place tests in `src/test/java/` and Flyway migrations in `src/main/resources/db/migration/`.
 - `frontend/`: React/TypeScript application. `src/app/` contains the entry point and styles, `src/features/` holds feature code, `src/shared/` holds reusable code, and `src/assets/fonts/` holds self-hosted fonts and their licenses.

@@ -1,6 +1,7 @@
 package com.example.shortener.link;
 
 import org.junit.jupiter.api.Test;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.concurrent.Executors;
 import java.util.stream.IntStream;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +28,32 @@ class LinkPostgresIT {
     @Autowired private LinkService service;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private MockMvc mvc;
+    @Autowired private ObjectMapper mapper;
     @MockitoSpyBean private ShortCodeGenerator generator;
+
+    @Test
+    void createdLinkCanBeOpenedAnonymouslyAndLookedUpWithExactCase() throws Exception {
+        doReturn("Us02AbCd").when(generator).generate();
+        String destination = "https://example.com/us02/café/%20?q=one%2Ftwo#fragment";
+        String response = mvc.perform(post("/api/v1/links").contentType("application/json")
+                        .content(mapper.writeValueAsString(new CreateLinkRequest(destination))))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String code = mapper.readTree(response).get("shortCode").asText();
+        Long rowsBefore = jdbc.queryForObject("SELECT count(*) FROM links", Long.class);
+        mvc.perform(get("/r/" + code).queryParam("extra", "ignored"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://example.com/us02/caf%C3%A9/%20?q=one%2Ftwo#fragment"))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(content().string(""));
+        mvc.perform(head("/r/" + code)).andExpect(status().isFound()).andExpect(content().string(""));
+        for (String missing : new String[]{"us02abcd", "not-a-code"}) {
+            mvc.perform(get("/r/" + missing)).andExpect(status().isNotFound())
+                    .andExpect(content().contentType("text/html;charset=UTF-8"))
+                    .andExpect(header().doesNotExist("Location"));
+        }
+        assertEquals(rowsBefore, jdbc.queryForObject("SELECT count(*) FROM links", Long.class));
+        assertEquals(destination, jdbc.queryForObject("SELECT original_url FROM links WHERE short_code = ?", String.class, code));
+    }
 
     @Test
     void migrationPersistenceAndRealUniqueConstraintRetry() {

@@ -57,7 +57,7 @@ export function CreateLinkForm() {
 
   return (
     <div className="link-workspace">
-      <form onSubmit={submit} noValidate aria-busy={loading} aria-describedby="availability-note">
+      <form onSubmit={submit} noValidate aria-busy={loading}>
         <label htmlFor="original-url">URL to shorten</label>
         <p id="url-help" className="field-help">Include http:// or https://.</p>
         <div className="form-row">
@@ -74,7 +74,7 @@ export function CreateLinkForm() {
         {submission.status === 'error' && <p id="form-error" className="error" role="alert">{submission.message}</p>}
         <p className="progress" role="status">{loading ? 'Saving your link.' : ''}</p>
       </form>
-      <section className="result" aria-labelledby="result-title" aria-describedby="availability-note">
+      <section className="result" aria-labelledby="result-title">
         <h2 id="result-title">{submission.status === 'success' ? 'Your short link' : 'Your result'}</h2>
         <div aria-live="polite" aria-atomic="true">
           {submission.status === 'success' ? (

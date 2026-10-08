@@ -18,7 +18,7 @@ public class LinkController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create an anonymous short link", description = "Accepts HTTP/HTTPS URLs up to 8192 characters, including local hosts. Each request creates a new link. Redirects are not implemented yet.")
+    @Operation(summary = "Create an anonymous short link", description = "Accepts HTTP/HTTPS URLs up to 8192 characters, including local hosts. Each request creates a new link. The returned short URL opens the destination through a public 302 redirect.")
     @ApiResponses({@ApiResponse(responseCode = "201", description = "Link committed to PostgreSQL",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = CreateLinkResponse.class))),
             @ApiResponse(responseCode = "400", description = "Invalid URL or malformed JSON",

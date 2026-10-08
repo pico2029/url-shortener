@@ -100,9 +100,11 @@ class RegistrationIntegrationTest {
     }
 
     @Test
-    void exposesHealthButKeepsOtherRoutesProtected() throws Exception {
+    void exposesHealthAndRedirectsButKeepsPrivateRoutesProtected() throws Exception {
         mvc.perform(get("/actuator/health")).andExpect(status().isOk());
-        for (String path : List.of("/api/v1/links", "/r/example", "/v3/api-docs", "/swagger-ui/index.html")) {
+        mvc.perform(get("/r/example")).andExpect(status().isNotFound())
+                .andExpect(content().contentType("text/html;charset=UTF-8"));
+        for (String path : List.of("/api/v1/links", "/v3/api-docs", "/swagger-ui/index.html")) {
             mvc.perform(get(path)).andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
         }

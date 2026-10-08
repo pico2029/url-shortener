@@ -1,14 +1,14 @@
 # URL Shortener
 
-A URL-shortener project built with a **Java/Spring Boot backend**, a **React/TypeScript frontend**, **PostgreSQL**, and **Redis**. Anonymous short-link creation, account registration and login are available; redirects remain planned. Builds and services run through **Docker Compose**.
+A URL-shortener project built with a **Java/Spring Boot backend**, a **React/TypeScript frontend**, **PostgreSQL**, and **Redis**. Anonymous short-link creation, public redirects, account registration and login are available. Builds and services run through **Docker Compose**.
 
 ## Project status
 
-The project implements US01 anonymous link creation, registration and JWT login, with a placeholder dashboard. Redirects, link management and logout remain planned.
+The project implements US01 anonymous link creation, US02 public redirects, registration and JWT login, with a placeholder dashboard. Link management and logout remain planned.
 
 | Available | To be implemented |
 |---|---|
-| Link creation, registration, login and current-user APIs | Redirects |
+| Link creation, public redirects, registration, login and current-user APIs | Link ownership |
 | English link creation form, Italian account forms and placeholder dashboard | Dashboard content and link management |
 | PostgreSQL and Redis configuration | Application caching and rate limiting |
 | Flyway users/links migrations and JPA persistence | Remaining domain migrations |
@@ -17,7 +17,7 @@ The project implements US01 anonymous link creation, registration and JWT login,
 | Multi-stage Dockerfiles and Docker Compose | Analytics, custom aliases, and expiration |
 | Infrastructure, registration and persistence checks; feature tests | Remaining feature tests |
 
-**Registration and login are implemented:** `/register` includes password confirmation; `/login` checks existing accounts. Both successful flows navigate to `/dashboard`, which currently contains only its title. Registration automatically logs in through the login API. Redirects, link management and a logout control remain unimplemented. Generated short URLs can be copied manually but do not yet open destinations.
+**Registration and login are implemented:** `/register` includes password confirmation; `/login` checks existing accounts. Both successful flows navigate to `/dashboard`, which currently contains only its title. Registration automatically logs in through the login API. Link management and a logout control remain unimplemented. Generated short URLs can be copied manually and open their destinations without login.
 
 ## Technology stack
 
@@ -232,7 +232,7 @@ Default credentials are for local development only. Compose passes `DATABASE_URL
 
 Flyway applies `V1__create_users.sql` for users and `V2__create_links.sql` for links, with unique constraints on email and short code. The merged numbering preserves the local authentication database, which already applied users V1. A database from the separate US01 branch that already recorded links as V1 requires explicit Flyway-history reconciliation before using this merged version; do not delete volumes or blindly repair checksums. Hibernate does not generate tables. Coordinate migration versions before adding new ones.
 
-Spring Security allows anonymous link creation (`POST /api/v1/links`), registration, login and the internal health check. Other routes remain protected: unauthenticated GET requests receive JSON `401`; modifying requests without CSRF tokens receive `403`. Link creation, registration and login POST requests are exempt from CSRF checks. Form login, HTTP Basic, request caching and the generated demo user are disabled. Protected APIs accept an `Authorization: Bearer <token>` header; Swagger/OpenAPI also remain protected.
+Spring Security allows anonymous link creation (`POST /api/v1/links`), redirects (`GET` and `HEAD /r/{shortCode}`), registration, login and the internal health check. Other routes remain protected: unauthenticated GET requests receive JSON `401`; modifying requests without CSRF tokens receive `403`. Link creation, registration and login POST requests are exempt from CSRF checks. Form login, HTTP Basic, request caching and the generated demo user are disabled. Protected APIs accept an `Authorization: Bearer <token>` header; Swagger/OpenAPI also remain protected. An explicitly supplied invalid Bearer token still receives `401`, including on public routes.
 
 ## Verification
 
@@ -246,11 +246,12 @@ The script uses Docker to verify:
 
 - Backend health, including PostgreSQL and Redis connectivity.
 - The home, registration, login and dashboard HTML entry points and the presence of compiled React content. Browser interaction is covered separately by frontend tests and manual checks.
-- Forwarding of protected API, redirect, Swagger, and OpenAPI GET requests to the backend, with `401` expected until their features are implemented.
+- Forwarding of protected API, Swagger, and OpenAPI GET requests to the backend, with `401` expected without authentication.
+- Public redirects through Nginx: `302` with the original `Location` and `Cache-Control: no-store`, plus an English HTML `404` for a missing code.
 - Anonymous link creation and invalid URL rejection without insertion.
 - Registration through Nginx (`201`) and duplicate rejection (`409`), using a unique synthetic email per run.
 - Blocking of external access to Actuator.
-- PostgreSQL cluster, link and registered-account persistence after container recreation.
+- PostgreSQL cluster, link and registered-account persistence after container recreation, including a working redirect for the persisted link.
 
 Verification recreates the application containers, causing a brief interruption. Each run leaves a verification link and one synthetic `verify-<uuid>@example.com` account in the development database; it does not delete existing data or volumes.
 
@@ -271,6 +272,7 @@ docker run --rm --mount "type=bind,source=$PWD/frontend,target=/workspace" -w /w
 | Method | Path | Authentication | Behavior |
 |---|---|---|---|
 | `POST` | `/api/v1/links` | Public | Create and persist a short link |
+| `GET`, `HEAD` | `/r/{shortCode}` | Public | `302` to the saved destination; HTML `404` if absent, HTML `503` if persistence is unavailable |
 | `POST` | `/api/v1/auth/register` | Public | Create an account; return `201` with its public fields |
 | `POST` | `/api/v1/auth/login` | Public | Verify credentials; return `200` with a JWT and expiry |
 | `GET` | `/api/v1/auth/me` | Bearer JWT | Return the authenticated user's public fields |
@@ -286,13 +288,12 @@ These endpoints **have not been implemented yet**:
 | `GET` | `/api/v1/links` | List the user's links |
 | `DELETE` | `/api/v1/links/{shortCode}` | Delete a link |
 | `GET` | `/api/v1/links/{shortCode}/stats` | Retrieve link statistics |
-| `GET` | `/r/{shortCode}` | Redirect to the original URL |
 
 The `/r/` prefix separates short links from SPA pages. Nginx already reserves these paths: API and redirect requests do not receive the frontend HTML fallback.
 
 ## Roadmap
 
-1. **Core links:** creation and persistence are implemented; add public `302` redirects (US02).
+1. **Core links:** creation, persistence and public `302` redirects (US01–US02) are implemented.
 2. **Backend foundations:** extend the existing account migration, validation, error handling, tests and API documentation to link features.
 3. **Performance:** Redis caching with TTL and rate limiting.
 4. **Account management:** add logout, link ownership, dashboard content and custom aliases to the implemented registration/JWT login flow.
@@ -331,6 +332,28 @@ Errors have `code`, `message`, and nullable `field`:
 ```
 
 Malformed JSON uses `INVALID_REQUEST`; persistence failures use `SERVICE_UNAVAILABLE`. Error messages do not expose database details.
+
+## US02 — Open a short link
+
+Open the `shortUrl` returned by link creation, including links created before US02:
+
+```http
+GET /r/aB3dE7fG
+```
+
+For an existing code, the response has an empty body:
+
+```http
+HTTP/1.1 302 Found
+Location: https://example.com/a-long-path?query=value#section
+Cache-Control: no-store
+```
+
+Resolution reads PostgreSQL in a read-only transaction. Codes are case-sensitive and are looked up without trimming, case conversion or a new length restriction. Destination paths, queries, fragments and existing percent escapes are preserved; Unicode characters are encoded as an ASCII URI without double encoding. Query parameters added to the short URL are not forwarded. The destination is never fetched or checked for availability.
+
+A missing code returns `404` with `Content-Type: text/html; charset=UTF-8`, the English title “Link not found”, an explanation and a “Back to home” link. Database or transaction failures return an English HTML `503 Service unavailable` page without internal details. Error responses have no `Location`. All these responses use `Cache-Control: no-store`. `HEAD` is public and returns the corresponding status and headers without a body.
+
+The HTML error pages are served directly by the backend and work without JavaScript. No schema migration, Redis caching, click analytics or expiration is introduced by US02.
 
 ## US03 — Registration
 
@@ -382,7 +405,7 @@ Without host Maven, use the dedicated runner from the repository root:
 # Unit tests only, also run during the backend image build
 docker compose --profile test run --rm backend-tests mvn -B -ntp verify
 
-# Unit tests and real PostgreSQL integration tests — required for US03
+# Unit tests and real PostgreSQL integration tests — required for link and account stories
 docker compose --profile test run --rm backend-tests mvn -B -ntp verify -Pintegration
 ```
 
@@ -399,7 +422,7 @@ npm test
 npm run build
 ```
 
-For full verification, run the integration suite above, frontend tests, `docker compose build`, `docker compose up -d --wait --wait-timeout 180`, and `bash scripts/verify.sh`. In the browser, check navigation between Accedi and Registrati, mismatched password confirmation, successful registration/login, dashboard refresh, keyboard navigation, and desktop/mobile layouts. A passing application build alone does not verify the browser flow or container persistence. Public deployment remains outside scope.
+For full verification, run the integration suite above, frontend tests, `docker compose build`, `docker compose up -d --wait --wait-timeout 180`, and `bash scripts/verify.sh`. In the browser, create and open a short link without login, check the missing-code page and its home link, navigation between Accedi and Registrati, mismatched password confirmation, successful registration/login, dashboard refresh, keyboard navigation, and desktop/mobile layouts. A passing application build alone does not verify the browser flow or container persistence. Public deployment remains outside scope.
 
 ## Login and dashboard
 
