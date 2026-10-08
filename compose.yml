@@ -1,6 +1,21 @@
 name: url-shortener
 
 services:
+  backend-tests:
+    profiles: ["test"]
+    image: maven:3.9.11-eclipse-temurin-21
+    working_dir: /workspace
+    volumes:
+      - ./backend:/workspace
+      - maven-cache:/root/.m2
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      JAVA_TOOL_OPTIONS: "-Dapi.version=${DOCKER_API_VERSION:-1.44}"
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+      TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
   postgres:
     image: postgres:17.6-alpine
     environment:
@@ -32,6 +47,7 @@ services:
     image: url-shortener-backend:0.0.1
     build: ./backend
     environment:
+      JWT_SECRET: ${JWT_SECRET:-}
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-shortener}
       DATABASE_USER: ${POSTGRES_USER:-shortener}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-shortener-local}
@@ -75,3 +91,4 @@ networks:
 
 volumes:
   postgres-data:
+  maven-cache:

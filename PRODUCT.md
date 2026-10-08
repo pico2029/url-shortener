@@ -28,7 +28,7 @@ Development and verification use Docker Compose, with Nginx serving the React/Ty
 
 ### Current implementation
 
-The repository is an application skeleton: a static React placeholder, Spring Boot entry point, and configured infrastructure. Application endpoints, account flows, link operations, domain migrations, and feature tests have not been implemented. Planned capabilities must not be presented as working features.
+The repository has configured infrastructure, a React home page and registration form, and a Spring Boot registration API. US03 registration is implemented with a public API, PostgreSQL users migration, password hashing, an Italian `/register` form, and backend/frontend feature tests. Login and JWT session verification are implemented; registration includes password confirmation and automatically logs in. Both forms lead to a dashboard showing only its title. Logout, link operations and personal management remain unimplemented. Planned capabilities must not be presented as working features.
 
 ### Confirmed product decisions
 
@@ -51,7 +51,7 @@ The README and user stories define the following planned behavior:
 - Provide configurable request limits, returning `429` with `Retry-After` when exceeded.
 - Handle applicable loading, empty, success, and error states with understandable feedback.
 
-Detailed alias rules, authentication/session storage, analytics timezone, rate-limit policies, anonymous-link management, and hosting remain open decisions. No pricing, commercial differentiation, or availability guarantees have been established.
+JWT sessions use per-tab sessionStorage and last one hour. Detailed alias rules, analytics timezone, rate-limit policies, anonymous-link management, and hosting remain open decisions. No pricing, commercial differentiation, or availability guarantees have been established.
 
 ## Brand Commitments
 

@@ -1,23 +1,23 @@
 # URL Shortener
 
-An application skeleton for shortening URLs, built with a **Java/Spring Boot backend**, a **React/TypeScript frontend**, **PostgreSQL**, and **Redis**. All builds and services run through **Docker Compose**.
+A URL-shortener project built with a **Java/Spring Boot backend**, a **React/TypeScript frontend**, **PostgreSQL**, and **Redis**. Account registration and login are available; URL shortening is still planned. Builds and services run through **Docker Compose**.
 
 ## Project status
 
-The project provides the initial structure and configuration for implementing features incrementally.
+The project implements registration and JWT login, with a placeholder dashboard; link features and logout remain planned.
 
 | Available | To be implemented |
 |---|---|
-| Spring Boot entry point | Link creation and redirects |
-| Static React page | Dashboard and link management |
+| Spring Boot registration, login and current-user APIs | Link creation and redirects |
+| React home, registration, login and placeholder dashboard | Dashboard content and link management |
 | PostgreSQL and Redis configuration | Application caching and rate limiting |
-| Flyway and Spring Data JPA configuration | Entities, repositories, and domain migrations |
-| Spring Security with default behavior | Registration, login, and JWT authentication |
-| OpenAPI, Swagger UI, and health checks | Application endpoint documentation |
+| Flyway users migration and JPA persistence | Link entities and migrations |
+| Registration, JWT login and session verification | Logout |
+| Authentication endpoint documentation, Swagger UI, and health checks | Documentation for remaining endpoints |
 | Multi-stage Dockerfiles and Docker Compose | Analytics, custom aliases, and expiration |
-| Infrastructure verification script | Feature unit and integration tests |
+| Infrastructure, registration and persistence checks; feature tests | Remaining feature tests |
 
-**No application endpoints have been implemented yet.** The only Java class is `ShortenerApplication`. Feature directories contain `.gitkeep` files rather than empty placeholder classes.
+**Registration and login are implemented:** `/register` includes password confirmation; `/login` checks existing accounts. Both successful flows navigate to `/dashboard`, which currently contains only its title. Registration automatically logs in through the login API. Link features and a logout control remain unimplemented.
 
 ## Technology stack
 
@@ -27,17 +27,18 @@ The project provides the initial structure and configuration for implementing fe
 | Persistence | Spring Data JPA, PostgreSQL 17.6, PostgreSQL JDBC |
 | Migrations | Flyway with PostgreSQL support |
 | Cache | Redis 7.4.6, Spring Data Redis |
-| Security | Spring Security; JWT authentication is planned |
+| Security | Spring Security; JWT Bearer authentication |
 | Frontend | React 19.2.0, TypeScript 5.9.3, HTML, and CSS |
 | Frontend build | Vite 7.3.7, Node.js 22.21.1, and npm |
 | Backend build | Maven 3.9.11 |
 | Web server and reverse proxy | Nginx 1.28.0 |
 | API documentation | OpenAPI and Swagger UI through springdoc-openapi 2.8.13 |
 | Backend health | Spring Boot Actuator |
-| Test dependencies | JUnit 5, Mockito, Testcontainers |
+| Backend tests | JUnit 5, Mockito, PostgreSQL Testcontainers |
+| Frontend tests | Vitest, React Testing Library, jsdom |
 | Containerization | Docker and Docker Compose |
 
-JUnit, Mockito, and Testcontainers are included as dependencies, but there are no Java tests yet. The repository currently **does not contain GitHub Actions workflows**. Checks can be run manually using the included script.
+JUnit and Mockito cover registration, validation and error handling. PostgreSQL Testcontainers covers HTTP, migrations, uniqueness, concurrent registrations, login and JWT verification. Vitest and React Testing Library cover password confirmation, both forms, navigation, session expiry and dashboard access. The repository currently **does not contain GitHub Actions workflows**. Checks can be run manually using the included script.
 
 ## Architecture
 
@@ -67,9 +68,10 @@ frontend / Nginx :80
 | Service | Responsibility | Host access |
 |---|---|---|
 | `frontend` | Nginx serves the SPA and forwards requests to the backend | Port `8080`, configurable |
-| `backend` | Runs Spring Boot and future APIs | No published ports |
+| `backend` | Runs Spring Boot registration, login and authenticated APIs | No published ports |
 | `postgres` | Stores data in a named volume | No published ports |
 | `redis` | Provides a rebuildable cache without persistence | No published ports |
+| `backend-tests` | Optional Maven/Testcontainers runner, enabled by the `test` profile | No application port |
 
 The `ingress` network connects the frontend and backend. The internal `data` network connects the backend, PostgreSQL, and Redis. The frontend does not access the data services directly.
 
@@ -122,7 +124,7 @@ The Dockerfiles use multi-stage builds: Maven/JDK produces the JAR executed by J
 
 ### Feature boundaries
 
-| Backend module | Future responsibility |
+| Backend module | Responsibility |
 |---|---|
 | `link` | Link creation, management, aliases, expiration, caching, and redirects |
 | `auth` | Registration and login |
@@ -132,22 +134,61 @@ The Dockerfiles use multi-stage builds: Maven/JDK produces the JAR executed by J
 | `ratelimit` | Request limits using Redis |
 | `shared` | Common configuration and error handling |
 
-Controllers, services, repositories, entities, and DTOs will be added inside each module when their features are implemented. The frontend follows a similar separation in `features`. The `app` directory contains the entry point, while `shared` is reserved for reusable elements.
+The `auth`, `user`, `security` and `shared` modules contain the implemented account flow, persistence, JWT configuration and error handling. Other feature modules remain placeholders. The frontend follows a similar separation in `features`: `features/auth` contains the shared login/registration form and session storage; `app` contains routing and the placeholder dashboard; `shared` contains the API client and navigation helper.
 
 ## Getting started
 
 Docker Engine with Docker Compose, or Docker Desktop, must be **running**. The first build requires an internet connection to download images and dependencies.
 
-From the repository root:
+### First start or changes to both applications
 
-```bash
-docker compose up --build
-```
-
-Open [http://localhost:8080](http://localhost:8080). To start in the background and wait for health checks:
+From the repository root, build and start in the background, waiting for healthy services:
 
 ```bash
 docker compose up --build -d --wait --wait-timeout 180
+```
+
+The first build can take several minutes while Docker downloads images and dependencies. The backend build runs Maven verification, including unit tests; the frontend build installs dependencies, checks TypeScript and compiles with Vite. Docker reuses cached layers when their inputs are unchanged. The wait timeout applies to service readiness and does not limit image build time.
+
+| Page | Behavior |
+|---|---|
+| [Home](http://localhost:8080/) | Entry page with links to login and registration |
+| [Accedi](http://localhost:8080/login) | Email/password login for existing accounts |
+| [Registrati](http://localhost:8080/register) | Email, password and matching password confirmation |
+| [Dashboard](http://localhost:8080/dashboard) | Only the title “Dashboard” after successful session verification; redirects to login without a valid session |
+
+Both successful forms lead to the dashboard. Registration creates an account and then automatically calls login. No link management or logout control is available yet.
+
+### Subsequent starts without code changes
+
+Reuse the existing images for a faster start:
+
+```bash
+docker compose up -d
+```
+
+This does not rebuild images, so source changes will not appear until you rebuild the affected application. There is no hot reload.
+
+### Rebuild only the changed application
+
+When the other services are already running, rebuild and recreate only the affected service:
+
+```bash
+# Frontend changes only
+docker compose build frontend
+docker compose up -d --no-deps frontend
+
+# Backend changes only
+docker compose build backend
+docker compose up -d --no-deps backend
+```
+
+`--no-deps` leaves dependencies alone and does not start stopped PostgreSQL, Redis or backend services. If the stack is stopped, run `docker compose up -d` afterward to start all services using the rebuilt images.
+
+To see build or startup errors directly in the terminal, use foreground mode:
+
+```bash
+docker compose up --build
 ```
 
 ### Service management
@@ -165,6 +206,9 @@ docker compose ps
 # Follow service logs
 docker compose logs -f
 
+# Show recent application errors
+docker compose logs --tail=100 backend frontend
+
 # Stop and remove containers while preserving the database
 docker compose down
 ```
@@ -181,12 +225,13 @@ The application starts with local defaults without requiring a `.env` file. To c
 | `POSTGRES_DB` | `shortener` | Database name |
 | `POSTGRES_USER` | `shortener` | PostgreSQL user |
 | `POSTGRES_PASSWORD` | `shortener-local` | Local PostgreSQL password |
+| `JWT_SECRET` | Empty; a random signing key is generated at startup | Optional Base64-encoded signing secret of at least 32 bytes; retains token validity across backend restarts |
 
-Default credentials are for local development only. Compose passes `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`, `REDIS_HOST`, and `REDIS_PORT` to the backend. The names `postgres` and `redis` are internal Docker addresses. Future frontend API calls will use relative `/api/v1/*` paths.
+Default credentials are for local development only. Compose passes `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, and `JWT_SECRET` to the backend. The names `postgres` and `redis` are internal Docker addresses. Frontend API calls use relative `/api/v1/*` paths through Nginx.
 
-Flyway is enabled, but there are no application migrations yet. Hibernate does not generate tables. Flyway may create its own schema history table.
+Flyway applies `V1__create_users.sql` to create the users table and its unique normalized-email constraint. Hibernate does not generate tables. Coordinate migration versions before adding new ones.
 
-Spring Security retains its default configuration. API requests with `Accept: application/json` receive `401`, and Swagger requires authentication. The default user is `user`, with a temporary password generated in the backend logs on each startup. This behavior is not an application account system.
+Spring Security allows anonymous registration, login and the internal health check. Other routes remain protected: unauthenticated GET requests receive JSON `401`; modifying requests without CSRF tokens receive `403`. Registration and login POST requests are exempt from CSRF checks. Form login, HTTP Basic, request caching and the generated demo user are disabled. Protected APIs accept an `Authorization: Bearer <token>` header; Swagger/OpenAPI also remain protected.
 
 ## Verification
 
@@ -199,14 +244,17 @@ bash scripts/verify.sh
 The script uses Docker to verify:
 
 - Backend health, including PostgreSQL and Redis connectivity.
-- The HTML page and the presence of compiled React content.
-- Forwarding of API, redirect, Swagger, and OpenAPI requests to the backend, with `401` expected in the skeleton.
+- The home, registration, login and dashboard HTML entry points and the presence of compiled React content. Browser interaction is covered separately by frontend tests and manual checks.
+- Forwarding of protected API, redirect, Swagger, and OpenAPI GET requests to the backend, with `401` expected until their features are implemented.
+- Registration through Nginx (`201`) and duplicate rejection (`409`), using a unique synthetic email per run.
 - Blocking of external access to Actuator.
-- PostgreSQL cluster persistence after container recreation.
+- PostgreSQL cluster and registered-account persistence after container recreation.
 
-Verification recreates all containers, causing a brief interruption. It does not add application tables or data.
+Verification recreates the application containers, causing a brief interruption. Each run leaves one synthetic `verify-<uuid>@example.com` account in the development database; it does not delete existing data or volumes.
 
-The backend build runs Maven `verify`; the frontend build runs TypeScript and Vite. When Testcontainers tests are introduced, the test container will need access to the Docker engine.
+If `JWT_SECRET` is empty, backend recreation invalidates existing sessions; sign in again afterward. Registered accounts remain in PostgreSQL.
+
+The backend build runs Maven `verify`; the frontend build runs TypeScript and Vite. Ordinary Maven verification excludes tests tagged `integration`; the explicit integration profile runs them with Docker access (see below).
 
 To regenerate the lockfile without installing npm on the host:
 
@@ -214,7 +262,19 @@ To regenerate the lockfile without installing npm on the host:
 docker run --rm --mount "type=bind,source=$PWD/frontend,target=/workspace" -w /workspace node:22.21.1-alpine npm install --package-lock-only --ignore-scripts
 ```
 
-## Planned API contracts
+## API endpoints
+
+### Implemented
+
+| Method | Path | Authentication | Behavior |
+|---|---|---|---|
+| `POST` | `/api/v1/auth/register` | Public | Create an account; return `201` with its public fields |
+| `POST` | `/api/v1/auth/login` | Public | Verify credentials; return `200` with a JWT and expiry |
+| `GET` | `/api/v1/auth/me` | Bearer JWT | Return the authenticated user's public fields |
+
+The registration endpoint itself does not issue a token; automatic login is performed by the frontend with a separate request. Detailed contracts appear below.
+
+### Planned
 
 These endpoints **have not been implemented yet**:
 
@@ -224,8 +284,6 @@ These endpoints **have not been implemented yet**:
 | `GET` | `/api/v1/links` | List the user's links |
 | `DELETE` | `/api/v1/links/{shortCode}` | Delete a link |
 | `GET` | `/api/v1/links/{shortCode}/stats` | Retrieve link statistics |
-| `POST` | `/api/v1/auth/register` | Register an account |
-| `POST` | `/api/v1/auth/login` | Log in |
 | `GET` | `/r/{shortCode}` | Redirect to the original URL |
 
 The `/r/` prefix separates short links from SPA pages. Nginx already reserves these paths: API and redirect requests do not receive the frontend HTML fallback.
@@ -233,9 +291,86 @@ The `/r/` prefix separates short links from SPA pages. Nginx already reserves th
 ## Roadmap
 
 1. **Core links:** creation, unique Base62 codes, persistence, and `302` redirects.
-2. **Backend foundations:** domain migrations, validation, error handling, tests, and API documentation.
+2. **Backend foundations:** extend the existing account migration, validation, error handling, tests and API documentation to link features.
 3. **Performance:** Redis caching with TTL and rate limiting.
-4. **Accounts:** registration, JWT login, link ownership, and custom aliases.
+4. **Account management:** add logout, link ownership, dashboard content and custom aliases to the implemented registration/JWT login flow.
 5. **Analytics:** click events, expiration, and statistics.
 
-Hot reload, CI workflows, public deployment, Kafka, Kubernetes, and advanced monitoring are outside the current skeleton.
+Hot reload, CI workflows, public deployment, Kafka, Kubernetes, and advanced monitoring are outside the current implementation scope.
+
+## US03 — Registration
+
+Open [http://localhost:8080/register](http://localhost:8080/register), also linked from the home page. The form handles loading, password confirmation, validation, duplicates and network errors. Its Accedi/Registrati navigation connects `/login` and `/register`. After account creation, the frontend calls login automatically, saves the session and opens `/dashboard`. If automatic login fails, it explains that the account was created and asks the user to switch to Accedi, without attempting another registration. No email verification or password recovery is implemented.
+
+```http
+POST /api/v1/auth/register
+Content-Type: application/json
+
+{"email":"  Utente@Example.com  ","password":"una password sufficientemente lunga"}
+```
+
+Email is required, stripped of surrounding Unicode whitespace with Java `strip()`, lowercased with `Locale.ROOT`, then validated with Jakarta Bean Validation `@Email` and a maximum length of 254. No provider-specific transformations are applied. Uniqueness applies to the normalized address, including simultaneous requests.
+
+Password is required and must have 15–128 UTF-16 code units (`String.length()` in Java, `.length` in JavaScript). Spaces and Unicode are accepted without trimming or normalization; supplementary Unicode characters count as two units. No mandatory character combinations are imposed. Only a salted PBKDF2 hash is stored, using Spring Security `defaultsForSpringSecurity_v5_8()` (PBKDF2-HMAC-SHA256, 310,000 iterations, 16-byte salt, 256-bit hash) with the `{pbkdf2@SpringSecurity_v5_8}` identifier. Login verifies the original password through the same reusable `PasswordEncoder`. Password confirmation is checked only in the registration form and is never sent to the API or stored.
+
+Successful registration returns `201` with exactly `id` (UUID), normalized `email`, and `createdAt` (UTC ISO-8601). It does not return credentials, a JWT or a session cookie.
+
+Errors use `application/problem+json`, standard ProblemDetail fields and an additional stable `code`:
+
+| Status | Code | Meaning |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Invalid fields; `fieldErrors` maps field names to Italian messages |
+| 400 | `INVALID_JSON` | Missing or malformed JSON |
+| 409 | `EMAIL_ALREADY_REGISTERED` | Normalized email already exists |
+| 500 | `INTERNAL_ERROR` | Generic internal failure without implementation details |
+
+Example validation response (the `instance` contains the request path):
+
+```json
+{
+  "type": "about:blank",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "Controlla i campi indicati.",
+  "instance": "/api/v1/auth/register",
+  "code": "VALIDATION_ERROR",
+  "fieldErrors": {"password": "La password deve contenere da 15 a 128 caratteri."}
+}
+```
+
+## Feature tests
+
+With Java 21 and Maven installed, run `mvn verify` in `backend/` for unit tests or `mvn verify -Pintegration` for the full suite with Docker available. On Docker 29, add `-Dapi.version=1.44` to the latter command if needed.
+
+Without host Maven, use the dedicated runner from the repository root:
+
+```bash
+# Unit tests only, also run during the backend image build
+docker compose --profile test run --rm backend-tests mvn -B -ntp verify
+
+# Unit tests and real PostgreSQL integration tests — required for US03
+docker compose --profile test run --rm backend-tests mvn -B -ntp verify -Pintegration
+```
+
+The optional `backend-tests` service mounts the backend checkout, a Maven cache and the Docker socket. It uses `host.docker.internal` for Docker Desktop; `extra_hosts` provides the host gateway on Linux. It pins the docker-java API to 1.44 for compatibility with Docker 29; override `DOCKER_API_VERSION` if necessary. Testcontainers creates a separate temporary PostgreSQL instance and removes it afterward; it does not use the application's data volume. The profile is not started with ordinary `docker compose up`.
+
+Frontend tests and build:
+
+```bash
+cd frontend
+npm ci
+npm test
+npm run build
+```
+
+For full verification, run the integration suite above, frontend tests, `docker compose build`, `docker compose up -d --wait --wait-timeout 180`, and `bash scripts/verify.sh`. In the browser, check navigation between Accedi and Registrati, mismatched password confirmation, successful registration/login, dashboard refresh, keyboard navigation, and desktop/mobile layouts. A passing application build alone does not verify the browser flow or container persistence. Public deployment remains outside scope.
+
+## Login and dashboard
+
+`POST /api/v1/auth/login` accepts `email` and `password`; email is normalized like registration and password is preserved exactly. Existing accounts are compatible without a migration. Wrong passwords and unknown emails both return `401 INVALID_CREDENTIALS` with the same message. Malformed input returns `400`.
+
+A successful response (`200`) contains `accessToken`, `tokenType: "Bearer"`, and `expiresAt` in UTC. The token is signed with HS256, identifies the user by UUID, has issuer `url-shortener`, and expires after one hour. No cookie is created. The frontend stores the token in per-tab `sessionStorage`, preserves it across refreshes, and sends it as a Bearer header to `GET /api/v1/auth/me`. That endpoint returns only `id`, `email`, and `createdAt`. A missing, invalid or expired session redirects the dashboard to `/login`; transient verification failures allow a retry without deleting the session.
+
+`/dashboard` currently renders only the heading “Dashboard” after the session has been verified. Link management and the logout interface are not implemented yet.
+
+`JWT_SECRET` is optional for local development: set it to the Base64 encoding of at least 32 random bytes to retain token validity across backend restarts. For example, generate a value with `openssl rand -base64 32` and keep it in the ignored `.env` file. If empty, a random key is generated at startup, so restarting the backend invalidates existing tokens; accounts remain persisted. Never commit an actual signing secret. The `.env.example` and Compose configuration include this variable.

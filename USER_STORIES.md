@@ -2,7 +2,7 @@
 
 ## Stato del progetto
 
-Il progetto è uno scheletro iniziale. Docker Compose, PostgreSQL, Redis e Nginx sono configurati; il backend contiene soltanto l'avvio di Spring Boot e il frontend una pagina statica. Le funzionalità applicative, le migrazioni di dominio e i test devono ancora essere implementati.
+Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard con il solo titolo. Link, logout e gestione personale restano da implementare.
 
 Questo documento definisce il lavoro necessario per realizzare le funzionalità previste nel [README](README.md): link brevi, account, dashboard, alias personalizzati, scadenza, cache, limiti delle richieste e statistiche. Il deployment pubblico resta fuori dal perimetro attuale.
 
@@ -31,7 +31,7 @@ Prima di implementare le funzionalità, concordare:
 - Numerazione delle migrazioni Flyway, per evitare conflitti.
 - Regole degli alias, fuso orario delle statistiche e soglie del rate limiting.
 
-**Decisione di prodotto ancora da fissare:** consentire la creazione di link senza account oppure richiedere sempre il login. La roadmap permette di partire con la creazione pubblica e aggiungere successivamente la gestione personale. Se si consente la creazione anonima, occorre definire separatamente se e come quei link possano essere gestiti in seguito.
+**Decisione di prodotto confermata in PRODUCT.md:** la creazione di link sarà consentita senza account. Gli account serviranno alla gestione personale. La gestione o rivendicazione successiva dei link anonimi resta da definire; la registrazione non li assegna automaticamente al nuovo utente.
 
 ## User Story
 
@@ -71,7 +71,7 @@ Criteri di accettazione:
 - Email e password vengono validate secondo regole documentate.
 - Un'email già registrata viene rifiutata.
 - La password viene salvata tramite hashing e non in chiaro.
-- L'interfaccia conferma la registrazione o mostra un errore comprensibile.
+- Il form verifica la conferma password. Dopo la registrazione effettua l'accesso automatico e apre la dashboard; gli errori sono comprensibili.
 
 ### US04 — Accedere e uscire
 
