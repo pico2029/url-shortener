@@ -4,12 +4,12 @@ A URL-shortener project built with a **Java/Spring Boot backend**, a **React/Typ
 
 ## Project status
 
-The project implements US01–US05: anonymous and authenticated creation, registration, JWT login, client logout and a personal dashboard. Deletion and statistics remain planned.
+The project implements US01–US07: anonymous and authenticated creation, registration, JWT login, client logout, a personal dashboard, one-click link copying and owner-only deletion. Statistics remain planned.
 
 | Available | To be implemented |
 |---|---|
-| Link creation, public redirects, personal listing and account APIs | Link deletion |
-| English home, English account forms and personal dashboard | Link deletion and automatic copying |
+| Link creation, public redirects, personal listing, deletion and account APIs | Custom aliases and expiration |
+| English home, account forms, personal dashboard, copying and deletion | Statistics UI |
 | PostgreSQL and Redis configuration | Application caching and rate limiting |
 | Flyway users/links migrations and JPA persistence | Remaining domain migrations |
 | Registration, JWT login, expiry and client logout | JWT revocation (outside current scope) |
@@ -17,7 +17,7 @@ The project implements US01–US05: anonymous and authenticated creation, regist
 | Multi-stage Dockerfiles and Docker Compose | Analytics, custom aliases, and expiration |
 | Infrastructure, registration and persistence checks; feature tests | Remaining feature tests |
 
-**Registration and login are implemented:** `/register` includes password confirmation; `/login` checks existing accounts. Both successful flows navigate to `/dashboard`, with authenticated creation, paginated personal links and “Log out”. Registration automatically logs in through the login API. Deletion, automatic copying, expiration and statistics remain unimplemented. Generated short URLs can be copied manually and open their destinations without login.
+**Registration and login are implemented:** `/register` includes password confirmation; `/login` checks existing accounts. Both successful flows navigate to `/dashboard`, with authenticated creation, paginated personal links and “Log out”. Registration automatically logs in through the login API. Expiration and statistics remain unimplemented. Generated short URLs can be copied with one click or manually and open their destinations without login.
 
 ## Technology stack
 
@@ -38,7 +38,7 @@ The project implements US01–US05: anonymous and authenticated creation, regist
 | Frontend tests | Vitest, React Testing Library, jsdom |
 | Containerization | Docker and Docker Compose |
 
-JUnit and Mockito cover registration, validation and error handling. PostgreSQL Testcontainers covers HTTP, migrations, uniqueness, concurrent registrations, login and JWT verification. Vitest and React Testing Library cover password confirmation, both forms, navigation, session expiry and dashboard access. The repository currently **does not contain GitHub Actions workflows**. Checks can be run manually using the included script.
+JUnit and Mockito cover registration, validation and error handling. PostgreSQL Testcontainers covers HTTP, migrations, uniqueness, concurrent registrations, login and JWT verification. Vitest and React Testing Library cover password confirmation, both forms, navigation, session expiry, dashboard access and link-copy feedback. The repository currently **does not contain GitHub Actions workflows**. Checks can be run manually using the included script.
 
 ## Architecture
 
@@ -367,9 +367,9 @@ Content-Type: application/json
 {"email":"  Utente@Example.com  ","password":"una password sufficientemente lunga"}
 ```
 
-Email is required, stripped of surrounding Unicode whitespace with Java `strip()`, lowercased with `Locale.ROOT`, then validated with Jakarta Bean Validation `@Email` and a maximum length of 254. No provider-specific transformations are applied. Uniqueness applies to the normalized address, including simultaneous requests.
+Email is required, stripped of surrounding Unicode whitespace with Java `strip()`, lowercased with `Locale.ROOT`, then validated with Jakarta Bean Validation `@Email` and a maximum length of 30. No provider-specific transformations are applied. Uniqueness applies to the normalized address, including simultaneous requests.
 
-Password is required and must have 15–128 UTF-16 code units (`String.length()` in Java, `.length` in JavaScript). Spaces and Unicode are accepted without trimming or normalization; supplementary Unicode characters count as two units. No mandatory character combinations are imposed. Only a salted PBKDF2 hash is stored, using Spring Security `defaultsForSpringSecurity_v5_8()` (PBKDF2-HMAC-SHA256, 310,000 iterations, 16-byte salt, 256-bit hash) with the `{pbkdf2@SpringSecurity_v5_8}` identifier. Login verifies the original password through the same reusable `PasswordEncoder`. Password confirmation is checked only in the registration form and is never sent to the API or stored.
+Password is required and must have 6–18 UTF-16 code units (`String.length()` in Java, `.length` in JavaScript). Spaces and Unicode are accepted without trimming or normalization; supplementary Unicode characters count as two units. No mandatory character combinations are imposed. Only a salted PBKDF2 hash is stored, using Spring Security `defaultsForSpringSecurity_v5_8()` (PBKDF2-HMAC-SHA256, 310,000 iterations, 16-byte salt, 256-bit hash) with the `{pbkdf2@SpringSecurity_v5_8}` identifier. Login verifies the original password through the same reusable `PasswordEncoder`. Password confirmation is checked only in the registration form and is never sent to the API or stored.
 
 Successful registration returns `201` with exactly `id` (UUID), normalized `email`, and `createdAt` (UTC ISO-8601). It does not return credentials, a JWT or a session cookie.
 
@@ -392,7 +392,7 @@ Example validation response (the `instance` contains the request path):
   "detail": "Check the highlighted fields.",
   "instance": "/api/v1/auth/register",
   "code": "VALIDATION_ERROR",
-  "fieldErrors": {"password": "Your password must contain 15 to 128 characters."}
+  "fieldErrors": {"password": "Your password must contain 6 to 18 characters."}
 }
 ```
 
@@ -462,3 +462,33 @@ Pages start at zero; size defaults to 20 and accepts 1–100. Negative pages, no
 The dashboard translates `SAVED` as “Saved”, localizes dates in English, and displays selectable short URLs. Public redirects are available through `/r/{shortCode}`. Creation returns to the first page and refreshes the list. A failed refresh explicitly confirms that creation succeeded and offers retry. Home copy remains English; when a session is present its creation request also sends the JWT, without retrying as anonymous.
 
 Integration tests cover legacy-data migration, owner preservation across code collisions, account isolation, pagination and ordering. Frontend tests cover expiry, refresh, logout/history protection, stale responses, cancellation, loading, retry and refresh after creation.
+
+
+## US06 — Copy a short link
+
+“Copy link” is available after anonymous or authenticated creation and beside each personal link in the dashboard. It copies the complete `shortUrl` returned by the API without another HTTP request. Each button has independent feedback, is disabled while copying and displays “Link copied.” only after the clipboard write succeeds. Changing the URL resets feedback and ignores late results from an earlier copy.
+
+Copying uses `navigator.clipboard.writeText` in a secure context: `http://localhost:8080` works for local development; public hosting requires HTTPS. If the API is unavailable or the browser rejects the write, an accessible error explains how to select the address and copy it manually. The read-only URL remains selectable. No legacy copying fallback or permission preflight is used.
+
+Vitest tests cover the full copied value, pending state, failure/retry, unavailable clipboard, URL changes, late completion, Italian feedback, keyboard activation, anonymous/authenticated creation and independent dashboard rows without additional requests. Frontend build and the 17 link-feature tests passed during US06 implementation. Registration tests have been aligned with the current email/password limits. The full frontend suite passes 41 tests, and the standard Docker build passes 57 backend unit tests. Both updated services have been started through Docker Compose. Real clipboard paste and desktop/mobile visual checks remain pending because browser automation was unavailable in this session; verify these manually on localhost before marking end-to-end verification complete.
+
+
+## US07 — Delete a personal link
+
+`DELETE /api/v1/links/{shortCode}` requires a Bearer JWT. Ownership comes exclusively from the JWT subject. One transactional SQL deletion matches both code and owner; no client-supplied owner or separate ownership check is used. Successful deletion returns `204 No Content` after commit. Missing, anonymous, other users' and already deleted links return the same `404 LINK_NOT_FOUND`; missing/invalid/expired sessions return `401 UNAUTHORIZED`, and persistence failures return `503 SERVICE_UNAVAILABLE`. Errors use the link API's `{code, message, field}` JSON format. No migration is required.
+
+The dashboard offers “Delete link”, followed by an inline permanent-deletion confirmation with “Delete permanently” and “Cancel”. Focus moves to Cancel on opening, returns to Delete link on cancellation, and moves to the list heading after a successful refresh. Only one deletion runs at a time; creation and pagination are blocked during deletion and refresh. The client accepts an empty 204 without parsing JSON and retains existing authenticated-request cancellation and session protection.
+
+After deletion, the current page is reloaded. If that page is empty, the last valid page is loaded. A failed DELETE preserves the link and allows retry; a failed refresh after successful deletion explicitly reports that deletion succeeded and offers a list reload. A 404 DELETE reports that the link is unavailable and reloads the list. Public GET/HEAD redirects subsequently return 404.
+
+Redis does not yet cache redirects. US11 must invalidate the actual cache entries when deleting and prevent a concurrent resolution from repopulating a deleted link; this change introduces no speculative Redis keys or cache.
+
+Six focused US07 test scenarios were added: three backend scenarios (one parameterized) and three frontend scenarios. The relevant backend command is:
+
+```bash
+docker compose --profile test run --rm backend-tests mvn -B -ntp verify -Pintegration -Dtest=LinkServiceTest,LinkControllerTest,RedirectControllerTest,LinkResolutionServiceTest -Dit.test=LinkOwnershipIT,LinkPostgresIT
+```
+
+It passed 23 unit tests and 13 PostgreSQL integration checks. Frontend feature/session/navigation checks passed 31 tests and the frontend build passed. After aligning registration test fixtures with the current validation rules, the full frontend suite passes all 41 tests. Real-browser confirmation, keyboard and visual verification remain pending because browser automation was unavailable/not authorized in this session.
+
+The standard Docker build now passes all 57 backend unit tests. `docker compose up --build -d --wait --wait-timeout 180` successfully started the updated backend and frontend; Delete link is included in the served dashboard bundle.

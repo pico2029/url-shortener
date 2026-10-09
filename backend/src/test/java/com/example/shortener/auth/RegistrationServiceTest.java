@@ -49,19 +49,19 @@ class RegistrationServiceTest {
 
     @Test
     void validatesBoundariesAndRequiredFields() {
-        for (int length : new int[]{15, 128}) {
+        for (int length : new int[]{6, 18}) {
             assertTrue(validator.validate(request("a@example.com", "a".repeat(length))).isEmpty());
         }
-        for (String password : new String[]{null, "", "a".repeat(14), "a".repeat(129)}) {
+        for (String password : new String[]{null, "", "a".repeat(5), "a".repeat(19)}) {
             assertFalse(validator.validate(request("a@example.com", password)).isEmpty());
         }
-        for (String email : new String[]{null, "", " ", "invalid", "a".repeat(250) + "@example.com"}) {
+        for (String email : new String[]{null, "", " ", "invalid", "a".repeat(19) + "@example.com"}) {
             assertFalse(validator.validate(request(email, "a".repeat(15))).isEmpty());
         }
-        String maximumEmail = "a".repeat(64) + "@" + "b".repeat(63) + "." + "c".repeat(63) + "." + "d".repeat(61);
-        assertEquals(254, maximumEmail.length());
+        String maximumEmail = "a".repeat(18) + "@example.com";
+        assertEquals(30, maximumEmail.length());
         assertTrue(validator.validate(request(maximumEmail, "a".repeat(15))).isEmpty());
-        assertFalse(validator.validate(request(maximumEmail + "d", "a".repeat(15))).isEmpty());
+        assertFalse(validator.validate(request("a" + maximumEmail, "a".repeat(15))).isEmpty());
         assertTrue(validator.validate(request("a@example.com", " ".repeat(15))).isEmpty());
         assertTrue(validator.validate(request("a@example.com", "🔐".repeat(8))).isEmpty());
     }

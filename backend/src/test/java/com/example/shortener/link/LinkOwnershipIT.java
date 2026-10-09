@@ -11,6 +11,8 @@ import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -57,6 +59,45 @@ class LinkOwnershipIT {
         if (token != null) request.header("Authorization", "Bearer " + token);
         var result = mvc.perform(request).andExpect(status().isCreated()).andReturn();
         return mapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    @Test
+    void ownerDeletesLinkAndRedirectStopsWorking() throws Exception {
+        var link = create(tokenA, "https://example.com/delete", userA.getId());
+        String code = link.get("shortCode").asText();
+        mvc.perform(delete("/api/v1/links/" + code).header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isNoContent()).andExpect(content().string(""));
+        mvc.perform(get("/api/v1/links").header("Authorization", "Bearer " + tokenA))
+                .andExpect(jsonPath("$.totalElements").value(0));
+        mvc.perform(get("/r/" + code)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deletionRequiresAuthenticationAndOwnership() throws Exception {
+        String code = create(tokenA, "https://example.com/owned", userA.getId()).get("shortCode").asText();
+        mvc.perform(delete("/api/v1/links/" + code).header("Authorization", "Bearer " + tokenB))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("LINK_NOT_FOUND"));
+        mvc.perform(delete("/api/v1/links/" + code)).andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+        mvc.perform(get("/r/" + code)).andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://example.com/owned"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"missing", "anonymous", "deleted"})
+    void unavailableLinksReturnTheSameDeletionError(String scenario) throws Exception {
+        String code = "missing1";
+        if (!scenario.equals("missing")) {
+            code = create(scenario.equals("anonymous") ? null : tokenA,
+                    "https://example.com/unavailable", userA.getId()).get("shortCode").asText();
+            if (scenario.equals("deleted")) {
+                mvc.perform(delete("/api/v1/links/" + code).header("Authorization", "Bearer " + tokenA))
+                        .andExpect(status().isNoContent());
+            }
+        }
+        mvc.perform(delete("/api/v1/links/" + code).header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("LINK_NOT_FOUND"));
+        if (scenario.equals("anonymous")) mvc.perform(get("/r/" + code)).andExpect(status().isFound());
     }
 
     @Test

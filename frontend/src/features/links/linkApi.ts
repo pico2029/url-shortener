@@ -1,5 +1,5 @@
 import { ApiError, requestJson } from '../../shared/api';
-import { authenticatedJson } from '../auth/authenticatedApi';
+import { authenticatedEmpty, authenticatedJson } from '../auth/authenticatedApi';
 import { sessionToken } from '../auth/session';
 
 export interface CreatedLink {
@@ -61,4 +61,8 @@ export async function createLink(originalUrl: string, signal: AbortSignal, requi
     }
     throw error;
   }
+}
+
+export function deleteLink(shortCode: string, signal: AbortSignal): Promise<void> {
+  return authenticatedEmpty(`/api/v1/links/${encodeURIComponent(shortCode)}`, { method: 'DELETE', signal });
 }

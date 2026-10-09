@@ -1,6 +1,7 @@
 package com.example.shortener.shared;
 
 import com.example.shortener.link.InvalidUrlException;
+import com.example.shortener.link.LinkNotFoundException;
 import com.example.shortener.link.InvalidPageException;
 import com.example.shortener.auth.InvalidCredentialsException;
 import org.springframework.dao.DataAccessException;
@@ -18,6 +19,12 @@ import org.springframework.web.bind.annotation.*;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class ApiErrorHandler {
     public record ApiError(String code, String message, String field) {}
+
+    @ExceptionHandler(LinkNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiError notFound() {
+        return new ApiError("LINK_NOT_FOUND", "The link is not available.", null);
+    }
 
     @ExceptionHandler(InvalidUrlException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)

@@ -50,7 +50,7 @@ public class AuthController {
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Register an account", description = "Normalized, unique email; password of 15 to 128 UTF-16 code units. Does not create a session.")
+    @Operation(summary = "Register an account", description = "Normalized, unique email; password of 6 to 18 UTF-16 code units. Does not create a session.")
     @ApiResponse(responseCode = "201", description = "Account created without a session",
             content = @Content(schema = @Schema(implementation = RegisterResponse.class)))
     @ApiResponse(responseCode = "400", description = "Invalid data (VALIDATION_ERROR with fieldErrors) or malformed JSON (INVALID_JSON)",

@@ -7,10 +7,10 @@ import java.util.Locale;
 
 public class LoginRequest {
     @NotBlank(message = "Enter an email address.")
-    @Size(max = 254, message = "Your email address must not exceed 254 characters.")
+    @Size(max = 30, message = "Your email address must not exceed 30 characters.")
     private String email;
     @NotNull(message = "Enter a password.")
-    @Size(min = 1, max = 128, message = "Enter a valid password.")
+    @Size(min = 6, max = 18, message = "Enter a valid password.")
     private String password;
 
     public String getEmail() { return email; }

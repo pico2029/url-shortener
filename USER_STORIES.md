@@ -2,7 +2,7 @@
 
 ## Stato del progetto
 
-Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard inglese con creazione autenticata, elenco personale paginato e pulsante Log out. US01 aggiunge creazione anonima di link, validazione HTTP/HTTPS, codici Base62 univoci e persistenza PostgreSQL tramite API e form React. US04 e US05 includono logout locale, scadenza della sessione e isolamento dei link per proprietario. US02 aggiunge redirect pubblici `302` e pagine HTML inglesi per codici inesistenti (`404`) e persistenza indisponibile (`503`). Copia con un clic, eliminazione e statistiche restano da implementare.
+Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard inglese con creazione autenticata, elenco personale paginato e pulsante Log out. US01 aggiunge creazione anonima di link, validazione HTTP/HTTPS, codici Base62 univoci e persistenza PostgreSQL tramite API e form React. US04 e US05 includono logout locale, scadenza della sessione e isolamento dei link per proprietario. US02 aggiunge redirect pubblici `302` e pagine HTML inglesi per codici inesistenti (`404`) e persistenza indisponibile (`503`). US06 aggiunge copia con un clic, conferma ed errore accessibili nel risultato e nell’elenco personale. US07 aggiunge eliminazione definitiva riservata al proprietario e conferma inline nella dashboard. Le statistiche restano da implementare.
 
 Questo documento definisce il lavoro necessario per realizzare le funzionalità previste nel [README](README.md): link brevi, account, dashboard, alias personalizzati, scadenza, cache, limiti delle richieste e statistiche. Il deployment pubblico resta fuori dal perimetro attuale.
 
@@ -107,6 +107,10 @@ Criteri di accettazione:
 
 ### US06 — Copiare un link
 
+**Implementata; verifica browser finale da completare:** pulsante riutilizzabile nel risultato di creazione anonima/autenticata e in ogni riga della dashboard. Copia il `shortUrl` completo tramite Clipboard API, mostra conferma dopo il successo e segnala API assente o copia rifiutata indicando la copia manuale. Ogni pulsante ha stato indipendente, impedisce tentativi duplicati e ignora completamenti dopo cambio URL o smontaggio. Contesto sicuro richiesto: localhost in sviluppo, HTTPS per hosting pubblico; nessun fallback legacy.
+
+**Verifica US06:** build frontend e 17 test della feature link superati, inclusi 10 nuovi test di copia. Frontend aggiornato sano attraverso Docker Compose con il backend locale esistente. Test di registrazione allineati ai limiti attuali: suite frontend completa superata (41 test), build backend superata (57 test unitari). Incolla dagli appunti reali e verifica visiva desktop/mobile restano da eseguire: gli strumenti browser non erano disponibili/autorizzati nella sessione. I test simulano la Clipboard API e non certificano gli appunti reali.
+
 **Come utente, voglio copiare un link breve con un clic, per condividerlo rapidamente.**
 
 Responsabile: P1.
@@ -118,6 +122,12 @@ Criteri di accettazione:
 - Un eventuale errore di copia viene segnalato.
 
 ### US07 — Eliminare un link
+
+**Implementata per l’architettura attuale; verifica browser finale da completare:** `DELETE /api/v1/links/{shortCode}` autenticato, cancellazione transazionale condizionata da codice e proprietario JWT, `204` dopo commit e `404 LINK_NOT_FOUND` indistinguibile per link inesistenti, anonimi, altrui o già eliminati. Dashboard con conferma inline, gestione focus, errore/riprova e aggiornamento della pagina valida dopo eliminazione. I redirect eliminati restituiscono `404`.
+
+**Dipendenza US11:** attualmente i redirect non usano Redis. Quando verrà implementata la cache, invalidare le sue chiavi reali e impedire reinserimenti concorrenti di link eliminati. Nessuna invalidazione Redis speculativa è introdotta da US07.
+
+**Verifica:** sei scenari mirati aggiunti (tre backend, uno parametrizzato; tre frontend). Superati 23 test unitari backend, 13 verifiche con PostgreSQL, 31 test frontend pertinenti e build frontend. Test di registrazione allineati ai limiti attuali: suite frontend completa superata (41 test), build Docker standard superata (57 test unitari backend) e servizi aggiornati avviati sani nello stack normale. Verifica nel browser di conferma, tastiera e layout da completare: strumenti browser indisponibili/non autorizzati nella sessione.
 
 **Come utente autenticato, voglio eliminare un mio link, per impedirne ulteriori utilizzi.**
 

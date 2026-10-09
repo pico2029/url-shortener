@@ -11,7 +11,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function requestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function requestResponse(path: string, options: RequestInit): Promise<Response> {
   const response = await fetch(path, options);
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);
@@ -25,7 +25,16 @@ export async function requestJson<T>(path: string, options: RequestInit = {}): P
     }
     throw new ApiError(problem);
   }
+  return response;
+}
+
+export async function requestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await requestResponse(path, options);
   return response.json() as Promise<T>;
+}
+
+export async function requestEmpty(path: string, options: RequestInit = {}): Promise<void> {
+  await requestResponse(path, options);
 }
 
 export function postJson<T>(path: string, body: unknown): Promise<T> {

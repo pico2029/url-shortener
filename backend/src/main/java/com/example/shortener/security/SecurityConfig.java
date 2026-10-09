@@ -23,7 +23,7 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
 @Configuration
 public class SecurityConfig {
     private void writeUnauthorized(String path, HttpServletResponse response, ObjectMapper mapper) throws IOException {
-        if (path.equals("/api/v1/links")) {
+        if (path.equals("/api/v1/links") || path.startsWith("/api/v1/links/")) {
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             mapper.writeValue(response.getOutputStream(), new ApiError(
                     "UNAUTHORIZED", "Your session is invalid. Please log in again.", null));
@@ -48,7 +48,8 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .csrf(csrf -> csrf.ignoringRequestMatchers(PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/v1/auth/register"),
                         PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/v1/auth/login"),
-                        PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/v1/links")))
+                        PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/v1/links"),
+                        PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.DELETE, "/api/v1/links/{shortCode}")))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/r/{shortCode}").permitAll()
                         .requestMatchers(HttpMethod.HEAD, "/r/{shortCode}").permitAll()

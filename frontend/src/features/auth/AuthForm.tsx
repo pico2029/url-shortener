@@ -35,12 +35,12 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
     const next: FieldErrors = {};
     if (!normalizedEmail || emailInput.current?.validity.typeMismatch) {
       next.email = 'Enter a valid email address.';
-    } else if (normalizedEmail.length > 254) {
-      next.email = 'Your email address must not exceed 254 characters.';
+    } else if (normalizedEmail.length > 30) {
+      next.email = 'Your email address must not exceed 30 characters.';
     }
-    if (registering && (password.length < 15 || password.length > 128)) {
-      next.password = 'Your password must contain 15 to 128 characters.';
-    } else if (!registering && (!password || password.length > 128)) {
+    if (registering && (password.length < 6 || password.length > 18)) {
+      next.password = 'Your password must contain 6 to 18 characters.';
+    } else if (!registering && (!password || password.length > 18)) {
       next.password = 'Enter a valid password.';
     }
     if (registering && (!confirmation || confirmation !== password)) {
@@ -109,7 +109,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
             value={password} disabled={pending || accountCreated} aria-invalid={Boolean(errors.password)}
             aria-describedby={[registering ? 'password-help' : '', errors.password ? 'password-error' : ''].filter(Boolean).join(' ') || undefined}
             onChange={event => { setPassword(event.target.value); setErrors(current => ({ ...current, password: undefined, confirmPassword: undefined })); }} />
-          {registering && <p className="field-help" id="password-help">Use 15 to 128 characters. Spaces and symbols are allowed; no special combinations are required.</p>}
+          {registering && <p className="field-help" id="password-help">Use 6 to 18 characters. Spaces and symbols are allowed; no special combinations are required.</p>}
           {errors.password && <p className="field-error" id="password-error" role="alert">{errors.password}</p>}
         </div>
         {registering && <div className="field">

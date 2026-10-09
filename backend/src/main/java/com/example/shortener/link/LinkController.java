@@ -49,6 +49,18 @@ public class LinkController {
         return service.list(ownerId, page, size);
     }
 
+    @DeleteMapping("/{shortCode}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Delete a personal link", description = "Permanently deletes a link owned by the current JWT subject. Missing, anonymous and other users' links all return 404. The public redirect then returns 404.")
+    @ApiResponses({@ApiResponse(responseCode = "204", description = "Link deleted", content = @Content),
+            @ApiResponse(responseCode = "401", description = "Missing, invalid or expired identity", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "404", description = "Link not available to this owner", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "503", description = "Persistence unavailable", content = @Content(schema = @Schema(implementation = ApiError.class)))})
+    public void delete(@PathVariable String shortCode, @AuthenticationPrincipal Jwt jwt) {
+        service.delete(shortCode, currentUser.requiredId(jwt));
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create a short link", description = "Accepts HTTP/HTTPS URLs up to 8192 characters, including local hosts. Each request creates a new link. A valid Bearer JWT assigns it to the current user. Without a token creation is anonymous. Invalid, expired or unknown-user tokens return 401 without insertion. The returned short URL opens the destination through a public 302 redirect.")
