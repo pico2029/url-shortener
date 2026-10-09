@@ -2,7 +2,7 @@
 
 ## Stato del progetto
 
-Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard con il solo titolo. US01 aggiunge creazione anonima di link, validazione HTTP/HTTPS, codici Base62 univoci e persistenza PostgreSQL tramite API e form React. US02 aggiunge redirect pubblici `302` e pagine HTML inglesi per codici inesistenti (`404`) e indisponibilità della persistenza (`503`). Logout e gestione personale restano da implementare.
+Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard con form di creazione autenticata. US01 aggiunge creazione anonima di link, validazione HTTP/HTTPS, codici Base62 univoci e persistenza PostgreSQL tramite API e form React. US02 aggiunge redirect pubblici `302` e pagine HTML inglesi per codici inesistenti (`404`) e indisponibilità della persistenza (`503`). US08 aggiunge alias personalizzati facoltativi per utenti autenticati. Logout, proprietà dei link e gestione personale restano da implementare.
 
 Questo documento definisce il lavoro necessario per realizzare le funzionalità previste nel [README](README.md): link brevi, account, dashboard, alias personalizzati, scadenza, cache, limiti delle richieste e statistiche. Il deployment pubblico resta fuori dal perimetro attuale.
 
@@ -127,6 +127,8 @@ Criteri di accettazione:
 - Il link non funziona più, anche se era presente nella cache.
 
 ### US08 — Scegliere un alias
+
+Implementata: `POST /api/v1/links` accetta `alias` facoltativo. Dopo `String.strip()`, valori omessi, null o vuoti generano un codice Base62 di 8 caratteri; un alias non vuoto richiede JWT e 3–32 caratteri ASCII tra lettere, numeri, `-` e `_`. Maiuscole e minuscole restano distinte, senza parole riservate. Alias e codici generati condividono l'unicità globale PostgreSQL: collisioni esplicite restituiscono `409 ALIAS_ALREADY_TAKEN`, alias invalidi `400 INVALID_ALIAS`, assenza di login `401`. La dashboard riusa il form e gestisce gli errori; i redirect restano pubblici. US08 non introduce proprietà dei link, elenco, eliminazione, scadenza o cache. Il contratto completo è documentato nel README.
 
 **Come utente autenticato, voglio scegliere un codice personalizzato, per ottenere un link riconoscibile.**
 

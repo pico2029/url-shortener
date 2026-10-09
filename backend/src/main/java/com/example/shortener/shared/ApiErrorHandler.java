@@ -14,6 +14,24 @@ import org.springframework.web.bind.annotation.*;
 public class ApiErrorHandler {
     public record ApiError(String code, String message, String field) {}
 
+    @ExceptionHandler(com.example.shortener.link.InvalidAliasException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError invalidAlias(com.example.shortener.link.InvalidAliasException exception) {
+        return new ApiError("INVALID_ALIAS", exception.getMessage(), "alias");
+    }
+
+    @ExceptionHandler(com.example.shortener.link.AliasAlreadyTakenException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ApiError aliasTaken(com.example.shortener.link.AliasAlreadyTakenException exception) {
+        return new ApiError("ALIAS_ALREADY_TAKEN", exception.getMessage(), "alias");
+    }
+
+    @ExceptionHandler(com.example.shortener.link.AliasAuthenticationException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ApiError aliasAuthentication(com.example.shortener.link.AliasAuthenticationException exception) {
+        return new ApiError("UNAUTHORIZED", exception.getMessage(), null);
+    }
+
     @ExceptionHandler(InvalidUrlException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiError invalidUrl(InvalidUrlException exception) {

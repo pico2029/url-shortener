@@ -12,14 +12,16 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class LinkService {
     private final LinkRepository repository;
     private final UrlValidator validator;
+    private final AliasValidator aliases;
     private final ShortCodeGenerator generator;
     private final LinkProperties properties;
     private final TransactionTemplate transaction;
 
     public LinkService(LinkRepository repository, UrlValidator validator, ShortCodeGenerator generator,
-            LinkProperties properties, PlatformTransactionManager transactionManager) {
+            LinkProperties properties, PlatformTransactionManager transactionManager, AliasValidator aliases) {
         this.repository = repository;
         this.validator = validator;
+        this.aliases = aliases;
         this.generator = generator;
         this.properties = properties;
         this.transaction = new TransactionTemplate(transactionManager);
@@ -27,13 +29,20 @@ public class LinkService {
     }
 
     public CreateLinkResponse create(String originalUrl) {
+        return create(originalUrl, null);
+    }
+
+    public CreateLinkResponse create(String originalUrl, String requestedAlias) {
+        String alias = aliases.validate(requestedAlias);
         String url = validator.validate(originalUrl);
-        for (int attempt = 0; attempt < 5; attempt++) {
-            String code = generator.generate();
+        int attempts = alias == null ? 5 : 1;
+        for (int attempt = 0; attempt < attempts; attempt++) {
+            String code = alias == null ? generator.generate() : alias;
             try {
                 transaction.executeWithoutResult(status -> repository.saveAndFlush(new Link(url, code)));
                 return new CreateLinkResponse(url, code, properties.shortUrl(code));
             } catch (DataAccessException | TransactionException exception) {
+                if (alias != null && isCodeCollision(exception)) throw new AliasAlreadyTakenException();
                 if (!isCodeCollision(exception) || attempt == 4) {
                     throw new LinkUnavailableException(exception);
                 }

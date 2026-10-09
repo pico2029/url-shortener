@@ -15,7 +15,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-it('accede e naviga alla pagina con il solo titolo', async () => {
+it('accede e naviga alla dashboard con il form autenticato', async () => {
   fetchMock.mockResolvedValueOnce(response(200, session)).mockResolvedValueOnce(response(200, { email: 'user@example.com' }));
   render(<App />);
   const user = userEvent.setup();
@@ -24,7 +24,7 @@ it('accede e naviga alla pagina con il solo titolo', async () => {
   await user.type(screen.getByLabelText('Email'), 'USER@EXAMPLE.COM');
   await user.type(screen.getByLabelText('Password'), 'una password lunga');
   await user.click(screen.getByRole('button', { name: 'Log in' }));
-  await waitFor(() => expect(screen.getByRole('main').children).toHaveLength(1));
+  expect(await screen.findByLabelText('Custom alias (optional)')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
   expect(window.location.pathname).toBe('/dashboard');
   expect(fetchMock).toHaveBeenLastCalledWith('/api/v1/auth/me', expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer signed-token' }) }));
@@ -50,12 +50,12 @@ it('blocca la dashboard senza sessione', async () => {
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-it('mantiene la sessione dopo il refresh e mostra solo il titolo', async () => {
+it('mantiene la sessione dopo il refresh e mostra il form autenticato', async () => {
   saveSession(session);
   window.history.replaceState(null, '', '/dashboard');
   fetchMock.mockResolvedValue(response(200, {}));
   render(<App />);
-  await waitFor(() => expect(screen.getByRole('main').children).toHaveLength(1));
+  expect(await screen.findByLabelText('Custom alias (optional)')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
 });
 
@@ -74,4 +74,32 @@ it('rifiuta un token già scaduto senza contattare il server', async () => {
   render(<App />);
   await waitFor(() => expect(window.location.pathname).toBe('/login'));
   expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it('non mostra il form prima della verifica della sessione', async () => {
+  saveSession(session);
+  window.history.replaceState(null, '', '/dashboard');
+  let complete: ((value: ReturnType<typeof response>) => void) | undefined;
+  fetchMock.mockReturnValue(new Promise(resolve => { complete = resolve; }));
+  render(<App />);
+  expect(screen.getByRole('status')).toHaveTextContent('Checking your session');
+  expect(screen.queryByLabelText('Custom alias (optional)')).not.toBeInTheDocument();
+  complete?.(response(200, {}));
+  expect(await screen.findByLabelText('Custom alias (optional)')).toBeInTheDocument();
+});
+
+it('invia il Bearer e rimuove la sessione se la creazione restituisce 401', async () => {
+  saveSession(session);
+  window.history.replaceState(null, '', '/dashboard');
+  fetchMock.mockResolvedValueOnce(response(200, {})).mockResolvedValueOnce(response(401, { code: 'UNAUTHORIZED', detail: 'Expired' }));
+  render(<App />);
+  const user = userEvent.setup();
+  await user.type(await screen.findByLabelText('URL to shorten'), 'https://example.com');
+  await user.click(screen.getByRole('button', { name: 'Shorten URL' }));
+  await waitFor(() => expect(window.location.pathname).toBe('/login'));
+  expect(sessionStorage.length).toBe(0);
+  expect(fetchMock).toHaveBeenLastCalledWith('/api/v1/links', expect.objectContaining({
+    headers: expect.objectContaining({ Authorization: 'Bearer signed-token' }),
+    body: JSON.stringify({ originalUrl: 'https://example.com' }),
+  }));
 });

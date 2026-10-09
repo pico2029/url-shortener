@@ -16,7 +16,7 @@ public class Link {
     private Long id;
     @Column(name = "original_url", nullable = false, length = 8192)
     private String originalUrl;
-    @Column(name = "short_code", nullable = false, length = 8)
+    @Column(name = "short_code", nullable = false, length = 32)
     private String shortCode;
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;

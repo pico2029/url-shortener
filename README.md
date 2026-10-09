@@ -1,23 +1,23 @@
 # URL Shortener
 
-A URL-shortener project built with a **Java/Spring Boot backend**, a **React/TypeScript frontend**, **PostgreSQL**, and **Redis**. Anonymous short-link creation, public redirects, account registration and login are available. Builds and services run through **Docker Compose**.
+A URL-shortener project built with a **Java/Spring Boot backend**, a **React/TypeScript frontend**, **PostgreSQL**, and **Redis**. Anonymous short-link creation, authenticated custom aliases, public redirects, account registration and login are available. Builds and services run through **Docker Compose**.
 
 ## Project status
 
-The project implements US01 anonymous link creation, US02 public redirects, registration and JWT login, with a placeholder dashboard. Link management and logout remain planned.
+The project implements US01 anonymous link creation, US02 public redirects, registration, JWT login and US08 custom aliases. The dashboard provides authenticated link creation. Link ownership, management and logout remain planned.
 
 | Available | To be implemented |
 |---|---|
 | Link creation, public redirects, registration, login and current-user APIs | Link ownership |
-| English link creation, account forms and placeholder dashboard | Dashboard content and link management |
+| English link creation, account forms and dashboard creation form | Link listing and management |
 | PostgreSQL and Redis configuration | Application caching and rate limiting |
 | Flyway users/links migrations and JPA persistence | Remaining domain migrations |
 | Registration, JWT login and session verification | Logout |
 | Authentication endpoint documentation, Swagger UI, and health checks | Documentation for remaining endpoints |
-| Multi-stage Dockerfiles and Docker Compose | Analytics, custom aliases, and expiration |
+| Multi-stage Dockerfiles, Docker Compose and custom aliases | Analytics and expiration |
 | Infrastructure, registration and persistence checks; feature tests | Remaining feature tests |
 
-**Registration and login are implemented:** `/register` includes password confirmation; `/login` checks existing accounts. Both successful flows navigate to `/dashboard`, which currently contains only its title. Registration automatically logs in through the login API. Link management and a logout control remain unimplemented. Generated short URLs can be copied manually and open their destinations without login.
+**Registration and login are implemented:** `/register` includes password confirmation; `/login` checks existing accounts. Both successful flows navigate to `/dashboard`, where a verified session can create links with an optional custom alias. Registration automatically logs in through the login API. Link ownership, management and a logout control remain unimplemented. Generated short URLs can be copied manually and open their destinations without login.
 
 ## Technology stack
 
@@ -134,7 +134,7 @@ The Dockerfiles use multi-stage builds: Maven/JDK produces the JAR executed by J
 | `ratelimit` | Request limits using Redis |
 | `shared` | Common configuration and error handling |
 
-The `link` module contains URL validation, creation and persistence; the `auth`, `user`, `security` and `shared` modules contain the implemented account flow, persistence, JWT configuration and error handling. Other feature modules remain placeholders. The frontend follows a similar separation in `features`: `features/auth` contains the shared login/registration form and session storage; `app` contains routing and the placeholder dashboard; `shared` contains the API client and navigation helper.
+The `link` module contains URL and alias validation, creation and persistence; the `auth`, `user`, `security` and `shared` modules contain the implemented account flow, persistence, JWT configuration and error handling. Other feature modules remain placeholders. The frontend follows a similar separation in `features`: `features/auth` contains the shared login/registration form and session storage; `app` contains routing and the dashboard, which reuses the creation form from `features/links`; `shared` contains the API client and navigation helper.
 
 ## Getting started
 
@@ -155,7 +155,7 @@ The first build can take several minutes while Docker downloads images and depen
 | [Home](http://localhost:8080/) | Anonymous link creation and links to login and registration |
 | [Log in](http://localhost:8080/login) | Email/password login for existing accounts |
 | [Register](http://localhost:8080/register) | Email, password and matching password confirmation |
-| [Dashboard](http://localhost:8080/dashboard) | Only the title “Dashboard” after successful session verification; redirects to login without a valid session |
+| [Dashboard](http://localhost:8080/dashboard) | Link creation with an optional custom alias after session verification; redirects to login without a valid session |
 
 Both successful forms lead to the dashboard. Registration creates an account and then automatically calls login. No link management or logout control is available yet.
 
@@ -230,7 +230,7 @@ The application starts with local defaults without requiring a `.env` file. To c
 
 Default credentials are for local development only. Compose passes `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, and `JWT_SECRET` to the backend. The names `postgres` and `redis` are internal Docker addresses. Frontend API calls use relative `/api/v1/*` paths through Nginx.
 
-Flyway applies `V1__create_users.sql` for users and `V2__create_links.sql` for links, with unique constraints on email and short code. The merged numbering preserves the local authentication database, which already applied users V1. A database from the separate US01 branch that already recorded links as V1 requires explicit Flyway-history reconciliation before using this merged version; do not delete volumes or blindly repair checksums. Hibernate does not generate tables. Coordinate migration versions before adding new ones.
+Flyway applies `V1__create_users.sql` for users, `V2__create_links.sql` for links, and `V3__expand_link_short_code.sql` to widen short codes to 32 characters while preserving existing links and the unique constraint. The merged numbering preserves the local authentication database, which already applied users V1. A database from the separate US01 branch that already recorded links as V1 requires explicit Flyway-history reconciliation before using this merged version; do not delete volumes or blindly repair checksums. Hibernate does not generate tables. Coordinate migration versions before adding new ones.
 
 Spring Security allows anonymous link creation (`POST /api/v1/links`), redirects (`GET` and `HEAD /r/{shortCode}`), registration, login and the internal health check. Other routes remain protected: unauthenticated GET requests receive JSON `401`; modifying requests without CSRF tokens receive `403`. Link creation, registration and login POST requests are exempt from CSRF checks. Form login, HTTP Basic, request caching and the generated demo user are disabled. Protected APIs accept an `Authorization: Bearer <token>` header; Swagger/OpenAPI also remain protected. An explicitly supplied invalid Bearer token still receives `401`, including on public routes.
 
@@ -271,7 +271,7 @@ docker run --rm --mount "type=bind,source=$PWD/frontend,target=/workspace" -w /w
 
 | Method | Path | Authentication | Behavior |
 |---|---|---|---|
-| `POST` | `/api/v1/links` | Public | Create and persist a short link |
+| `POST` | `/api/v1/links` | Public without alias; Bearer JWT for a nonblank alias | Create and persist a short link |
 | `GET`, `HEAD` | `/r/{shortCode}` | Public | `302` to the saved destination; HTML `404` if absent, HTML `503` if persistence is unavailable |
 | `POST` | `/api/v1/auth/register` | Public | Create an account; return `201` with its public fields |
 | `POST` | `/api/v1/auth/login` | Public | Verify credentials; return `200` with a JWT and expiry |
@@ -296,7 +296,7 @@ The `/r/` prefix separates short links from SPA pages. Nginx already reserves th
 1. **Core links:** creation, persistence and public `302` redirects (US01–US02) are implemented.
 2. **Backend foundations:** extend the existing account migration, validation, error handling, tests and API documentation to link features.
 3. **Performance:** Redis caching with TTL and rate limiting.
-4. **Account management:** add logout, link ownership, dashboard content and custom aliases to the implemented registration/JWT login flow.
+4. **Account management:** add logout, link ownership, listing and deletion to the implemented registration/JWT login and custom-alias creation flow.
 5. **Analytics:** click events, expiration, and statistics.
 
 Hot reload, CI workflows, public deployment, Kafka, Kubernetes, and advanced monitoring are outside the current implementation scope.
@@ -332,6 +332,43 @@ Errors have `code`, `message`, and nullable `field`:
 ```
 
 Malformed JSON uses `INVALID_REQUEST`; persistence failures use `SERVICE_UNAVAILABLE`. Error messages do not expose database details.
+
+## US08 — Choose a custom alias
+
+The dashboard reuses the creation form with an optional **Custom alias** field. It sends a Bearer token even when the alias is blank. The anonymous home form sends only `originalUrl` without a token.
+
+```http
+POST /api/v1/links
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{"originalUrl":"https://example.com/promotion","alias":"Promo-2026"}
+```
+
+After commit, the API returns `201` with the existing response shape: `originalUrl`, `shortCode` (here `Promo-2026`), and the complete `shortUrl` (for example `http://localhost:8080/r/Promo-2026`). Opening this URL remains public.
+
+Alias rules:
+
+- Strip surrounding whitespace using Java `String.strip()`; internal whitespace is invalid. Non-breaking spaces are not stripped and are invalid.
+- An omitted, `null`, empty or whitespace-only alias generates an eight-character Base62 code, without requiring login.
+- A nonblank alias requires a valid JWT and must match `^[A-Za-z0-9_-]{3,32}$`: 3–32 ASCII letters, numbers, hyphens or underscores.
+- Preserve case: `Promo` and `promo` are distinct. No reserved words apply because redirects use `/r/{shortCode}`.
+- Aliases and generated codes share one global namespace across all users. An existing generated code also blocks a matching alias.
+- Aliases must be JSON strings or `null`; numbers, booleans, arrays and objects are rejected without coercion.
+
+| Status | Code | Behavior |
+|---|---|---|
+| 400 | `INVALID_ALIAS` | Invalid alias; `field` is `alias` |
+| 400 | `INVALID_REQUEST` | Malformed JSON or a non-string alias |
+| 401 | `UNAUTHORIZED` | Nonblank alias without JWT; message asks the user to log in |
+| 409 | `ALIAS_ALREADY_TAKEN` | “This alias is already taken. Choose another alias.”; `field` is `alias` |
+| 503 | `SERVICE_UNAVAILABLE` | Persistence or commit failure |
+
+These application errors retain `{code, message, field}`. Invalid or expired supplied Bearer tokens are rejected by Spring Security with `401` Problem Detail even on requests without an alias. Authentication for a nonblank alias is checked before alias/URL validation or persistence.
+
+PostgreSQL's existing `uk_links_short_code` constraint guarantees uniqueness under concurrency. An explicit alias is inserted once: a collision returns `409`, without generating another code. Automatic codes retain up to five attempts in separate transactions. Success is returned only after commit. The dashboard focuses alias errors and preserves input on validation, conflict or service failure; `401` clears the session and returns to login.
+
+US08 does not add ownership, listing, deletion, expiration or Redis caching. Creating a link while authenticated does not yet associate it with a user.
 
 ## US02 — Open a short link
 

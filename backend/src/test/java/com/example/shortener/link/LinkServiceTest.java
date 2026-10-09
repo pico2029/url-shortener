@@ -25,7 +25,7 @@ class LinkServiceTest {
         when(transactions.getTransaction(any())).thenAnswer(invocation -> new SimpleTransactionStatus());
         when(generator.generate()).thenReturn("aB3dE7fG", "bB3dE7fG");
         service = new LinkService(repository, new UrlValidator(), generator,
-                new LinkProperties(URI.create("http://localhost:8080")), transactions);
+                new LinkProperties(URI.create("http://localhost:8080")), transactions, new AliasValidator());
     }
 
     @Test
@@ -77,5 +77,48 @@ class LinkServiceTest {
 
     private DataIntegrityViolationException collision() {
         return new DataIntegrityViolationException("collision", new SQLException("uk_links_short_code", "23505"));
+    }
+
+    @Test
+    void savesNormalizedAliasWithoutGeneratingCode() {
+        assertEquals("Promo-2026", service.create("https://example.com", "  Promo-2026  ").shortCode());
+        verifyNoInteractions(generator);
+        verify(transactions).commit(any());
+        var saved = ArgumentCaptor.forClass(Link.class);
+        verify(repository).saveAndFlush(saved.capture());
+        assertEquals("Promo-2026", saved.getValue().getShortCode());
+    }
+
+    @Test
+    void explicitCollisionIsNotRetriedOrReplaced() {
+        when(repository.saveAndFlush(any())).thenThrow(collision());
+        assertThrows(AliasAlreadyTakenException.class, () -> service.create("https://example.com", "Promo"));
+        verify(repository).saveAndFlush(any());
+        verify(transactions).rollback(any());
+        verifyNoInteractions(generator);
+    }
+
+    @Test
+    void invalidAliasNeverStartsTransaction() {
+        assertThrows(InvalidAliasException.class, () -> service.create("https://example.com", "bad alias"));
+        verifyNoInteractions(repository, transactions, generator);
+    }
+
+    @Test
+    void blankAliasGeneratesCode() {
+        assertEquals("aB3dE7fG", service.create("https://example.com", " \t\u2003 ").shortCode());
+        verify(generator).generate();
+    }
+
+    @Test
+    void aliasDoesNotTurnOtherConstraintsOrCommitFailureIntoConflict() {
+        when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("other",
+                new SQLException("another_constraint", "23505")));
+        assertThrows(LinkUnavailableException.class, () -> service.create("https://example.com", "Promo"));
+        verify(repository).saveAndFlush(any());
+        reset(repository);
+        doThrow(new org.springframework.transaction.TransactionSystemException("commit")).when(transactions).commit(any());
+        assertThrows(LinkUnavailableException.class, () -> service.create("https://example.com", "Promo"));
+        verifyNoInteractions(generator);
     }
 }

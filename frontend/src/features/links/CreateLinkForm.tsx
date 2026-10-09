@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { createLink, LinkApiError, type CreatedLink } from './linkApi';
+import { normalizeAlias, validAlias } from './alias';
 
 type Submission =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'success'; link: CreatedLink }
-  | { status: 'error'; message: string; fieldError: boolean };
+  | { status: 'error'; message: string; field?: string };
 
 function validUrl(value: string): boolean {
   if (!value || value.length > 8192 || /\s/.test(value)) return false;
@@ -17,35 +18,49 @@ function validUrl(value: string): boolean {
   }
 }
 
-export function CreateLinkForm() {
+export function CreateLinkForm({ token, onUnauthorized }: { token?: string; onUnauthorized?: () => void }) {
   const [originalUrl, setOriginalUrl] = useState('');
+  const [alias, setAlias] = useState('');
   const [submission, setSubmission] = useState<Submission>({ status: 'idle' });
   const pending = useRef<AbortController | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const aliasInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => pending.current?.abort(), []);
+  useEffect(() => {
+    if (submission.status !== 'error') return;
+    if (submission.field === 'originalUrl') input.current?.focus();
+    if (submission.field === 'alias') aliasInput.current?.focus();
+  }, [submission]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending.current) return;
     const value = originalUrl.trim();
     if (!validUrl(value)) {
-      setSubmission({ status: 'error', message: 'Enter a complete http:// or https:// URL, up to 8,192 characters.', fieldError: true });
-      input.current?.focus();
+      setSubmission({ status: 'error', message: 'Enter a complete http:// or https:// URL, up to 8,192 characters.', field: 'originalUrl' });
+      return;
+    }
+    const normalizedAlias = token ? normalizeAlias(alias) : '';
+    if (!validAlias(normalizedAlias)) {
+      setSubmission({ status: 'error', message: 'Use 3–32 ASCII letters, numbers, hyphens or underscores. Aliases are case-sensitive.', field: 'alias' });
       return;
     }
     const controller = new AbortController();
     pending.current = controller;
     setSubmission({ status: 'loading' });
     try {
-      const link = await createLink(value, controller.signal);
+      const link = await createLink(value, controller.signal, { token, alias: normalizedAlias });
       if (!controller.signal.aborted) setSubmission({ status: 'success', link });
     } catch (error: unknown) {
       if (!controller.signal.aborted) {
-        const fieldError = error instanceof LinkApiError && error.field === 'originalUrl';
-        setSubmission({ status: 'error', fieldError,
+        if (error instanceof LinkApiError && error.status === 401 && onUnauthorized) {
+          onUnauthorized();
+          return;
+        }
+        const field = error instanceof LinkApiError ? error.field : undefined;
+        setSubmission({ status: 'error', field,
           message: error instanceof LinkApiError ? error.message : 'The service could not be reached. Please try again.' });
-        if (fieldError) input.current?.focus();
       }
     } finally {
       if (pending.current === controller) pending.current = null;
@@ -53,7 +68,8 @@ export function CreateLinkForm() {
   }
 
   const loading = submission.status === 'loading';
-  const invalid = submission.status === 'error' && submission.fieldError;
+  const invalid = submission.status === 'error' && submission.field === 'originalUrl';
+  const invalidAlias = submission.status === 'error' && submission.field === 'alias';
 
   return (
     <div className="link-workspace">
@@ -69,6 +85,17 @@ export function CreateLinkForm() {
               setOriginalUrl(event.target.value);
               if (submission.status !== 'idle') setSubmission({ status: 'idle' });
             }} />
+          {token && <div>
+            <label htmlFor="custom-alias">Custom alias (optional)</label>
+            <p id="alias-help" className="field-help">Use 3–32 ASCII letters, numbers, hyphens or underscores. Aliases are case-sensitive. Leave blank to generate a code automatically.</p>
+            <input ref={aliasInput} id="custom-alias" name="alias" type="text" autoComplete="off"
+              spellCheck={false} autoCapitalize="none" value={alias} disabled={loading}
+              aria-invalid={invalidAlias} aria-describedby={invalidAlias ? 'alias-help form-error' : 'alias-help'}
+              placeholder="Promo-2026" onChange={(event) => {
+                setAlias(event.target.value);
+                if (submission.status !== 'idle') setSubmission({ status: 'idle' });
+              }} />
+          </div>}
           <button type="submit" disabled={loading}>{loading ? 'Creating your link…' : 'Shorten URL'}</button>
         </div>
         {submission.status === 'error' && <p id="form-error" className="error" role="alert">{submission.message}</p>}
