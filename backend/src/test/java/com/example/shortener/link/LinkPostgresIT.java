@@ -1,5 +1,11 @@
 package com.example.shortener.link;
 
+import com.example.shortener.link.dto.CreateLinkRequest;
+import com.example.shortener.link.service.LinkService;
+import com.example.shortener.link.service.ShortCodeGenerator;
+import com.example.shortener.user.entity.User;
+import com.example.shortener.user.repository.UserRepository;
+
 import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.concurrent.Executors;
@@ -26,7 +32,7 @@ class LinkPostgresIT {
     @Container @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17.6-alpine");
     @Autowired private LinkService service;
-    @Autowired private com.example.shortener.user.UserRepository users;
+    @Autowired private com.example.shortener.user.repository.UserRepository users;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private MockMvc mvc;
     @Autowired private ObjectMapper mapper;
@@ -60,7 +66,7 @@ class LinkPostgresIT {
     void migrationPersistenceAndRealUniqueConstraintRetry() {
         doReturn("AAAAAAAA", "AAAAAAAA", "BBBBBBBB").when(generator).generate();
         var first = service.create("https://example.com/path?q=one#fragment");
-        var owner = users.saveAndFlush(new com.example.shortener.user.User("retry-owner@example.com", "unused"));
+        var owner = users.saveAndFlush(new com.example.shortener.user.entity.User("retry-owner@example.com", "unused"));
         var second = service.create("https://example.com/path?q=one#fragment", null, owner.getId());
         assertEquals(owner.getId(), jdbc.queryForObject("SELECT owner_id FROM links WHERE short_code = 'BBBBBBBB'", java.util.UUID.class));
         assertNull(jdbc.queryForObject("SELECT owner_id FROM links WHERE short_code = 'AAAAAAAA'", java.util.UUID.class));

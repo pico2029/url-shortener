@@ -1,7 +1,9 @@
 package com.example.shortener.auth;
 
-import com.example.shortener.user.User;
-import com.example.shortener.user.UserRepository;
+import com.example.shortener.security.service.TokenService;
+
+import com.example.shortener.user.entity.User;
+import com.example.shortener.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
@@ -143,7 +145,7 @@ class RegistrationIntegrationTest {
     @Test
     void rejectsExpiredJwt() throws Exception {
         var claims = org.springframework.security.oauth2.jwt.JwtClaimsSet.builder()
-                .issuer(com.example.shortener.security.TokenService.ISSUER).subject(java.util.UUID.randomUUID().toString())
+                .issuer(com.example.shortener.security.service.TokenService.ISSUER).subject(java.util.UUID.randomUUID().toString())
                 .issuedAt(java.time.Instant.now().minusSeconds(7200)).expiresAt(java.time.Instant.now().minusSeconds(3600)).build();
         String token = jwtEncoder.encode(org.springframework.security.oauth2.jwt.JwtEncoderParameters.from(
                 org.springframework.security.oauth2.jwt.JwsHeader.with(org.springframework.security.oauth2.jose.jws.MacAlgorithm.HS256).build(), claims)).getTokenValue();

@@ -136,6 +136,20 @@ The Dockerfiles use multi-stage builds: Maven/JDK produces the JAR executed by J
 
 The `link` module contains URL validation, creation and persistence; the `auth`, `user`, `security` and `shared` modules contain the implemented account flow, persistence, JWT configuration and error handling. Other feature modules remain placeholders. The frontend follows a similar separation in `features`: `features/auth` contains the shared login/registration form and session storage; `features/links` contains the reusable creation form and personal dashboard; `app` contains routing; `shared` contains the API client and navigation helper.
 
+Implemented backend features use role subpackages without moving responsibilities outside their feature:
+
+| Feature | Subpackages |
+|---|---|
+| `link` | `controller`, `dto`, `service`, `entity`, `repository`, `config`, `exception` |
+| `auth` | `controller`, `dto`, `service`, `exception` |
+| `user` | `entity`, `repository` |
+| `security` | `config`, `service` |
+| `shared` | `config`, `exception` |
+
+Link services, validators, code generation, and redirect-cache helpers share `link/service`; this preserves package-private locking and cache coordination. Controllers and redirect HTML error handling live in `link/controller`, while JSON deserializers live alongside request DTOs in `link/dto`. Focused tests mirror the production subpackage, and broad integration tests remain at the feature root. `RedirectCacheIT` lives alongside the services because it verifies package-private cache coordination. The `analytics` and `ratelimit` backend packages and frontend analytics folder remain placeholders for planned work.
+
+Generated design-session files and review screenshots (`.impeccable/` and `artifacts/`) are excluded from Git. Installed repository skills and the product/design documentation are retained.
+
 ## Getting started
 
 Docker Engine with Docker Compose, or Docker Desktop, must be **running**. The first build requires an internet connection to download images and dependencies.

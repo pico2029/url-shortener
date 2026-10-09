@@ -2,9 +2,10 @@
 
 ## Project Structure & Module Organization
 
-US01 provides anonymous link creation and an English React form. US02 adds public 302 redirects and HTML error pages. Registration, JWT login, client logout and a personal dashboard with authenticated creation and paginated listing are also implemented; deletion and statistics remain planned. Consult `README.md` for current behavior, `PRODUCT.md` for product decisions, and `USER_STORIES.md` for planned work.
+US01–US09 and US11 are implemented: anonymous and authenticated link creation, public 302 redirects and HTML error pages, registration, JWT login, client logout, a personal dashboard with paginated listing, copying, owner-only deletion, custom aliases, expiration, and Redis redirect caching. Rate limiting and statistics remain planned. Consult `README.md` for current behavior, `PRODUCT.md` for product decisions, and `USER_STORIES.md` for planned work.
 
 - `backend/`: Java 21/Spring Boot application. Organize code under `src/main/java/com/example/shortener/` by feature (`link`, `auth`, `user`, `analytics`, `security`, `ratelimit`); reserve `shared` for common code. Place tests in `src/test/java/` and Flyway migrations in `src/main/resources/db/migration/`.
+- Within implemented backend features, use populated `controller`, `dto`, `service`, `entity`, `repository`, `config`, and `exception` subpackages as applicable. Keep link services and cache helpers together in `link/service` to preserve package-private coordination. Mirror focused tests in their subject's subpackage; keep broad integration tests at the feature root, except cache integration tests that need package-private service access. Retain empty feature placeholders only for planned analytics and rate limiting.
 - `frontend/`: React/TypeScript application. `src/app/` contains the entry point and styles, `src/features/` holds feature code, `src/shared/` holds reusable code, and `src/assets/fonts/` holds self-hosted fonts and their licenses.
 - `compose.yml` wires Nginx, the backend, PostgreSQL, and Redis; `scripts/verify.sh` checks infrastructure.
 

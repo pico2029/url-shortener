@@ -1,8 +1,10 @@
 package com.example.shortener.link;
 
-import com.example.shortener.security.TokenService;
-import com.example.shortener.user.User;
-import com.example.shortener.user.UserRepository;
+import com.example.shortener.link.entity.Link;
+
+import com.example.shortener.security.service.TokenService;
+import com.example.shortener.user.entity.User;
+import com.example.shortener.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;

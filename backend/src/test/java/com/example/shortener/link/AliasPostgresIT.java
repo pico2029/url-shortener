@@ -1,6 +1,12 @@
 package com.example.shortener.link;
 
-import com.example.shortener.security.TokenService;
+import com.example.shortener.link.exception.AliasAlreadyTakenException;
+import com.example.shortener.link.service.LinkService;
+import com.example.shortener.link.service.ShortCodeGenerator;
+import com.example.shortener.user.entity.User;
+import com.example.shortener.user.repository.UserRepository;
+
+import com.example.shortener.security.service.TokenService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.Map;
@@ -37,7 +43,7 @@ class AliasPostgresIT {
     @Autowired private MockMvc mvc;
     @Autowired private ObjectMapper mapper;
     @Autowired private JwtEncoder encoder;
-    @Autowired private com.example.shortener.user.UserRepository users;
+    @Autowired private com.example.shortener.user.repository.UserRepository users;
     @MockitoSpyBean private ShortCodeGenerator generator;
 
     @Test
@@ -137,7 +143,7 @@ class AliasPostgresIT {
 
     private String token() {
         Instant now = Instant.now();
-        var user = users.saveAndFlush(new com.example.shortener.user.User(UUID.randomUUID() + "@example.com", "test-only-hash"));
+        var user = users.saveAndFlush(new com.example.shortener.user.entity.User(UUID.randomUUID() + "@example.com", "test-only-hash"));
         var claims = JwtClaimsSet.builder().issuer(TokenService.ISSUER).subject(user.getId().toString())
                 .issuedAt(now).expiresAt(now.plusSeconds(3600)).build();
         return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
