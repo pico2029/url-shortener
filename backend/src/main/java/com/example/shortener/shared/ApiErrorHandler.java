@@ -1,6 +1,11 @@
 package com.example.shortener.shared;
 
 import com.example.shortener.link.InvalidUrlException;
+import com.example.shortener.link.InvalidPageException;
+import com.example.shortener.auth.InvalidCredentialsException;
+import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.TransactionException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import com.example.shortener.link.LinkController;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.Ordered;
@@ -26,9 +31,26 @@ public class ApiErrorHandler {
         return new ApiError("INVALID_REQUEST", "The request is invalid.", null);
     }
 
+    @ExceptionHandler({InvalidPageException.class,
+            MethodArgumentTypeMismatchException.class})
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError pagination() {
+        return new ApiError("INVALID_REQUEST", "Use page >= 0 and size between 1 and 100, without other parameters.", null);
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ApiError unauthorized() {
+        return new ApiError("UNAUTHORIZED", "Your session is invalid. Please log in again.", null);
+    }
+
+    @ExceptionHandler({DataAccessException.class, TransactionException.class})
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ApiError persistence() { return unavailable(); }
+
     @ExceptionHandler(LinkUnavailableException.class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     public ApiError unavailable() {
-        return new ApiError("SERVICE_UNAVAILABLE", "Your link could not be created. Please try again later.", null);
+        return new ApiError("SERVICE_UNAVAILABLE", "The link service is unavailable. Please try again later.", null);
     }
 }

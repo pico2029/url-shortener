@@ -10,7 +10,7 @@ docker compose exec -T frontend wget -qO- http://127.0.0.1/ | grep -F '<title>UR
 for page in register login dashboard; do
   docker compose exec -T frontend wget -qO- "http://127.0.0.1/$page" | grep -F '<title>URL Shortener</title>'
 done
-docker compose exec -T frontend sh -c 'grep -q "Crea un account" /usr/share/nginx/html/assets/*.js'
+docker compose exec -T frontend sh -c 'grep -q "Create an account" /usr/share/nginx/html/assets/*.js'
 
 response=$(docker compose exec -T backend curl --fail --silent -H 'Content-Type: application/json' --data '{"originalUrl":"https://example.com/us01?verified=true#fragment"}' http://frontend/api/v1/links)
 code=$(printf '%s' "$response" | sed -n 's/.*"shortCode":"\([A-Za-z0-9]\{8\}\)".*/\1/p')
@@ -47,12 +47,46 @@ test "$status" = 404
 # A UUID keeps repeated runs independent. These synthetic accounts remain in the
 # development database so persistence can be checked without deleting any data.
 verification_id=$(docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT gen_random_uuid()"')
-verification_email="verify-${verification_id}@example.com"
+verification_email="verify-${verification_id}-a@example.com"
+second_email="verify-${verification_id}-b@example.com"
 payload=$(printf '{"email":"%s","password":"verification password 2026"}' "$verification_email")
 status=$(printf '%s' "$payload" | docker compose exec -T backend curl --silent --output /dev/null --write-out '%{http_code}' -H 'Content-Type: application/json' --data-binary @- http://frontend/api/v1/auth/register)
 test "$status" = 201 || { echo "Registration failed: $status"; exit 1; }
 status=$(printf '%s' "$payload" | docker compose exec -T backend curl --silent --output /dev/null --write-out '%{http_code}' -H 'Content-Type: application/json' --data-binary @- http://frontend/api/v1/auth/register)
 test "$status" = 409 || { echo "Duplicate registration was not rejected: $status"; exit 1; }
+
+second_payload=$(printf '{"email":"%s","password":"verification password 2026"}' "$second_email")
+status=$(printf '%s' "$second_payload" | docker compose exec -T backend curl --silent --output /dev/null --write-out '%{http_code}' -H 'Content-Type: application/json' --data-binary @- http://frontend/api/v1/auth/register)
+test "$status" = 201
+
+login() {
+  printf '%s' "$1" | docker compose exec -T backend curl --fail --silent -H 'Content-Type: application/json' --data-binary @- http://frontend/api/v1/auth/login |
+    sed -n 's/.*"accessToken":"\([^" ]*\)".*/\1/p'
+}
+token_a=$(login "$payload")
+token_b=$(login "$second_payload")
+test -n "$token_a" && test -n "$token_b"
+create_personal() {
+  printf '{"originalUrl":"https://example.com/%s"}' "$2" |
+    docker compose exec -T backend curl --fail --silent -H "Authorization: Bearer $1" -H 'Content-Type: application/json' --data-binary @- http://frontend/api/v1/links |
+    sed -n 's/.*"shortCode":"\([A-Za-z0-9]\{8\}\)".*/\1/p'
+}
+code_a=$(create_personal "$token_a" "$verification_id-a")
+code_b=$(create_personal "$token_b" "$verification_id-b")
+test -n "$code_a" && test -n "$code_b"
+verify_isolation() {
+  local list_a list_b
+  list_a=$(docker compose exec -T backend curl --fail --silent -H "Authorization: Bearer $token_a" http://frontend/api/v1/links)
+  list_b=$(docker compose exec -T backend curl --fail --silent -H "Authorization: Bearer $token_b" http://frontend/api/v1/links)
+  printf '%s' "$list_a" | grep -qF "\"shortCode\":\"$code_a\""
+  printf '%s' "$list_b" | grep -qF "\"shortCode\":\"$code_b\""
+  printf '%s' "$list_a" | grep -qF '"totalElements":1'
+  printf '%s' "$list_b" | grep -qF '"totalElements":1'
+  if printf '%s' "$list_a" | grep -qF "$code_b"; then echo "Cross-account link exposed"; exit 1; fi
+  if printf '%s' "$list_b" | grep -qF "$code_a"; then echo "Cross-account link exposed"; exit 1; fi
+  if printf '%s%s' "$list_a" "$list_b" | grep -qF "\"shortCode\":\"$code\""; then echo "Anonymous link exposed"; exit 1; fi
+}
+verify_isolation
 
 account_snapshot() {
   printf "SELECT id, email, password_hash, created_at FROM users WHERE email = '%s';\n" "$verification_email" |
@@ -69,9 +103,14 @@ docker compose up -d --force-recreate --wait --wait-timeout 180
 cluster_after=$(docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT system_identifier FROM pg_control_system()"')
 test "$cluster_before" = "$cluster_after"
 test "$account_before" = "$(account_snapshot)"
+# Restart may rotate a temporary JWT signing key; obtain fresh sessions.
+token_a=$(login "$payload")
+token_b=$(login "$second_payload")
+test -n "$token_a" && test -n "$token_b"
+verify_isolation
 stored=$(printf "SELECT original_url FROM links WHERE short_code = '%s';\n" "$code" |
   docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At')
 test "$stored" = 'https://example.com/us01?verified=true#fragment'
 verify_redirect
 docker compose exec -T backend curl --fail --silent http://localhost:8080/actuator/health | grep -F '"status":"UP"'
-echo "Link creation, public redirects, registration, proxy and persistence checks passed."
+echo "Link creation, public redirects, login, account isolation, proxy and persistence checks passed."

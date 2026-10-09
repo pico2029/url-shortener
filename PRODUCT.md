@@ -28,13 +28,13 @@ Development and verification use Docker Compose, with Nginx serving the React/Ty
 
 ### Current implementation
 
-US01 creates anonymous links through an English React form and `POST /api/v1/links`, validates HTTP/HTTPS destinations, persists eight-character Base62 codes in PostgreSQL and displays full short URLs. Local destinations are allowed; availability is not checked. US02 opens saved links through public `302` redirects, with English HTML pages for missing codes (`404`) and persistence failures (`503`). US03 registration is implemented with a public API, PostgreSQL users migration, password hashing, an English `/register` form, and backend/frontend feature tests. Login and JWT session verification are implemented; registration includes password confirmation and automatically logs in. Both forms lead to a dashboard showing only its title. Logout, link management and personal management remain unimplemented. Planned capabilities must not be presented as working features.
+US01 creates anonymous links through an English React form and `POST /api/v1/links`, validates HTTP/HTTPS destinations, persists eight-character Base62 codes in PostgreSQL and displays full short URLs. Local destinations are allowed; availability is not checked. US02 opens saved links through public 302 redirects, with English HTML pages for missing codes (404) and persistence failures (503). US03 registration is implemented with a public API, PostgreSQL users migration, password hashing, an English `/register` form, and backend/frontend feature tests. Login and JWT session verification are implemented; registration includes password confirmation and automatically logs in. Both forms lead to an English dashboard with authenticated creation, paginated personal links and client logout. US04 and US05 use token-derived ownership and isolate accounts. Existing and newly anonymous links remain unowned; signing in never claims them. Deletion, copying with one click, expiration and statistics remain unimplemented. Planned capabilities must not be presented as working features.
 
 ### Confirmed product decisions
 
 - Anonymous visitors may create short links. Accounts are used for personal management.
 - Opening short links does not require authentication.
-- Ownership, recovery, and any later claiming of anonymously created links remain undecided. Do not assume anonymous links automatically belong to a later account.
+- Authenticated creation assigns ownership exclusively from the JWT subject. Recovery and any later claiming of anonymously created links remain undecided. Do not assume anonymous links automatically belong to a later account.
 
 ### Documented implementation scope
 

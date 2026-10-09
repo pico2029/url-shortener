@@ -90,6 +90,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
         <a href="/login" aria-current={!registering ? 'page' : undefined}>Log in</a>
         <a href="/register" aria-current={registering ? 'page' : undefined}>Register</a>
       </nav>
+      {!registering && new URLSearchParams(window.location.search).get('reason') === 'expired'
+        && <p role="status">Your session has expired or is no longer valid. Please log in again.</p>}
       <h1>{registering ? 'Create an account' : 'Log in'}</h1>
       <p className="intro">{registering ? 'Enter your details and confirm your password to create an account.' : 'Enter your email and password to log in.'}</p>
       <form noValidate onSubmit={submit} aria-busy={pending}>

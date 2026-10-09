@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { isCancelled } from '../auth/authenticatedApi';
 import { createLink, LinkApiError, type CreatedLink } from './linkApi';
 
 type Submission =
@@ -17,7 +18,10 @@ function validUrl(value: string): boolean {
   }
 }
 
-export function CreateLinkForm() {
+export function CreateLinkForm({ locale = 'en', authenticated = false, onCreated }: {
+  locale?: 'en' | 'it'; authenticated?: boolean; onCreated?: () => void;
+}) {
+  const t = (english: string, italian: string) => locale === 'it' ? italian : english;
   const [originalUrl, setOriginalUrl] = useState('');
   const [submission, setSubmission] = useState<Submission>({ status: 'idle' });
   const pending = useRef<AbortController | null>(null);
@@ -30,7 +34,7 @@ export function CreateLinkForm() {
     if (pending.current) return;
     const value = originalUrl.trim();
     if (!validUrl(value)) {
-      setSubmission({ status: 'error', message: 'Enter a complete http:// or https:// URL, up to 8,192 characters.', fieldError: true });
+      setSubmission({ status: 'error', message: t('Enter a complete http:// or https:// URL, up to 8,192 characters.', 'Inserisci un URL HTTP/HTTPS completo, entro 8.192 caratteri.'), fieldError: true });
       input.current?.focus();
       return;
     }
@@ -38,13 +42,16 @@ export function CreateLinkForm() {
     pending.current = controller;
     setSubmission({ status: 'loading' });
     try {
-      const link = await createLink(value, controller.signal);
-      if (!controller.signal.aborted) setSubmission({ status: 'success', link });
-    } catch (error: unknown) {
+      const link = await createLink(value, controller.signal, authenticated, locale);
       if (!controller.signal.aborted) {
+        setSubmission({ status: 'success', link });
+        onCreated?.();
+      }
+    } catch (error: unknown) {
+      if (!controller.signal.aborted && !isCancelled(error)) {
         const fieldError = error instanceof LinkApiError && error.field === 'originalUrl';
         setSubmission({ status: 'error', fieldError,
-          message: error instanceof LinkApiError ? error.message : 'The service could not be reached. Please try again.' });
+          message: error instanceof LinkApiError ? error.message : t('The service could not be reached. Please try again.', 'Il servizio non è raggiungibile. Riprova.') });
         if (fieldError) input.current?.focus();
       }
     } finally {
@@ -58,8 +65,8 @@ export function CreateLinkForm() {
   return (
     <div className="link-workspace">
       <form onSubmit={submit} noValidate aria-busy={loading}>
-        <label htmlFor="original-url">URL to shorten</label>
-        <p id="url-help" className="field-help">Include http:// or https://.</p>
+        <label htmlFor="original-url">{t('URL to shorten', 'URL da accorciare')}</label>
+        <p id="url-help" className="field-help">{t('Include http:// or https://.', 'Includi http:// oppure https://.')}</p>
         <div className="form-row">
           <input ref={input} id="original-url" name="originalUrl" type="url" inputMode="url"
             autoComplete="url" spellCheck={false} required value={originalUrl} disabled={loading}
@@ -69,30 +76,30 @@ export function CreateLinkForm() {
               setOriginalUrl(event.target.value);
               if (submission.status !== 'idle') setSubmission({ status: 'idle' });
             }} />
-          <button type="submit" disabled={loading}>{loading ? 'Creating your link…' : 'Shorten URL'}</button>
+          <button type="submit" disabled={loading}>{loading ? t('Creating your link…', 'Creazione in corso…') : t('Shorten URL', 'Accorcia URL')}</button>
         </div>
         {submission.status === 'error' && <p id="form-error" className="error" role="alert">{submission.message}</p>}
-        <p className="progress" role="status">{loading ? 'Saving your link.' : ''}</p>
+        <p className="progress" role="status">{loading ? t('Saving your link.', 'Salvataggio del link.') : ''}</p>
       </form>
       <section className="result" aria-labelledby="result-title">
-        <h2 id="result-title">{submission.status === 'success' ? 'Your short link' : 'Your result'}</h2>
+        <h2 id="result-title">{submission.status === 'success' ? t('Your short link', 'Il tuo link breve') : t('Your result', 'Risultato')}</h2>
         <div aria-live="polite" aria-atomic="true">
           {submission.status === 'success' ? (
             <div className="result-content">
-              <label htmlFor="short-url">Full short URL</label>
+              <label htmlFor="short-url">{t('Full short URL', 'URL breve completo')}</label>
               <input id="short-url" className="short-url" readOnly value={submission.link.shortUrl}
                 onFocus={(event) => event.currentTarget.select()} />
-              <p className="field-help">Select the address to copy it manually.</p>
+              <p className="field-help">{t('Select the address to copy it manually.', 'Seleziona l’indirizzo per copiarlo manualmente.')}</p>
               <div className="destination">
-                <h3>Destination</h3>
+                <h3>{t('Destination', 'Destinazione')}</h3>
                 <p>{submission.link.originalUrl}</p>
               </div>
-              <p className="saved-status">Link saved successfully.</p>
+              <p className="saved-status">{t('Link saved successfully.', 'Link creato correttamente.')}</p>
             </div>
           ) : (
             <div className="empty-result">
-              <p>{loading ? 'Your short link is on its way.' : 'Your short link will appear here.'}</p>
-              <p className="field-help">{loading ? 'Please wait while we save your URL.' : 'Enter a URL, then select Shorten URL.'}</p>
+              <p>{loading ? t('Your short link is on its way.', 'Stiamo creando il tuo link breve.') : t('Your short link will appear here.', 'Il tuo link breve apparirà qui.')}</p>
+              <p className="field-help">{loading ? t('Please wait while we save your URL.', 'Attendi il salvataggio dell’URL.') : t('Enter a URL, then select Shorten URL.', 'Inserisci un URL e premi Accorcia URL.')}</p>
             </div>
           )}
         </div>

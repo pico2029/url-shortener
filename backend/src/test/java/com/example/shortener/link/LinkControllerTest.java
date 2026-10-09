@@ -16,10 +16,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class LinkControllerTest {
     @Autowired private MockMvc mvc;
     @MockitoBean private LinkService service;
+    @MockitoBean private com.example.shortener.security.CurrentUser currentUser;
 
     @Test
     void anonymousPostWithoutCsrfReturnsCreated() throws Exception {
-        when(service.create("https://example.com")).thenReturn(new CreateLinkResponse(
+        when(service.create(eq("https://example.com"), isNull())).thenReturn(new CreateLinkResponse(
                 "https://example.com", "aB3dE7fG", "http://localhost:8080/r/aB3dE7fG"));
         mvc.perform(post("/api/v1/links").contentType("application/json")
                 .content("{\"originalUrl\":\"https://example.com\"}"))
@@ -29,7 +30,7 @@ class LinkControllerTest {
 
     @Test
     void invalidInputReturnsStructuredError() throws Exception {
-        when(service.create("invalid")).thenThrow(new InvalidUrlException());
+        when(service.create(eq("invalid"), isNull())).thenThrow(new InvalidUrlException());
         mvc.perform(post("/api/v1/links").contentType("application/json").content("{\"originalUrl\":\"invalid\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_URL"))
                 .andExpect(jsonPath("$.field").value("originalUrl"));
@@ -44,7 +45,7 @@ class LinkControllerTest {
 
     @Test
     void persistenceFailureDoesNotExposeDetails() throws Exception {
-        when(service.create(any())).thenThrow(new LinkUnavailableException(new RuntimeException("secret")));
+        when(service.create(any(), any())).thenThrow(new LinkUnavailableException(new RuntimeException("secret")));
         mvc.perform(post("/api/v1/links").contentType("application/json").content("{}"))
                 .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("SERVICE_UNAVAILABLE"));
     }

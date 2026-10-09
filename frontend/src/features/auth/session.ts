@@ -2,7 +2,7 @@ export type Session = { accessToken: string; expiresAt: string; tokenType: strin
 const sessionKey = 'shortener.session';
 
 export function saveSession(session: Session) {
-  sessionStorage.setItem(sessionKey, JSON.stringify(session));
+  sessionStorage.setItem(sessionKey, JSON.stringify({ ...session, sessionId: crypto.randomUUID() }));
 }
 
 export function clearSession() {
@@ -19,4 +19,18 @@ export function readSession(): Session | null {
   } catch { /* Unreadable storage is treated as an expired session. */ }
   clearSession();
   return null;
+}
+
+// Read the token without discarding expired sessions, for request identity checks.
+export function sessionToken(): string | null {
+  try {
+    const value: unknown = JSON.parse(sessionStorage.getItem(sessionKey) || 'null');
+    return value && typeof value === 'object' && 'accessToken' in value && typeof value.accessToken === 'string'
+      ? value.accessToken : null;
+  } catch { return null; }
+}
+
+// The identity changes on every login, even if the server issues the same JWT.
+export function sessionIdentity(): string | null {
+  return sessionStorage.getItem(sessionKey);
 }
