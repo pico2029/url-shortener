@@ -1,4 +1,4 @@
-import { ApiError, requestJson } from '../../shared/api';
+import { ApiError, requestJson, requestEmpty } from '../../shared/api';
 import { navigate } from '../../shared/navigation';
 import { clearSession, readSession, sessionIdentity } from './session';
 
@@ -15,7 +15,16 @@ export function isCancelled(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
 }
 
-export async function authenticatedJson<T>(path: string, options: RequestInit = {}): Promise<T> {
+export function authenticatedJson<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return authenticatedRequest(path, options, requestJson<T>);
+}
+
+export function authenticatedEmpty(path: string, options: RequestInit = {}): Promise<void> {
+  return authenticatedRequest(path, options, requestEmpty);
+}
+
+async function authenticatedRequest<T>(path: string, options: RequestInit,
+  request: (path: string, options: RequestInit) => Promise<T>): Promise<T> {
   const session = readSession();
   if (!session) {
     endSession('expired');
@@ -31,7 +40,7 @@ export async function authenticatedJson<T>(path: string, options: RequestInit = 
   headers.set('Accept', 'application/json');
   headers.set('Authorization', `Bearer ${session.accessToken}`);
   try {
-    const result = await requestJson<T>(path, { ...options, headers: Object.fromEntries(headers.entries()), signal: controller.signal });
+    const result = await request(path, { ...options, headers: Object.fromEntries(headers.entries()), signal: controller.signal });
     if (controller.signal.aborted || sessionIdentity() !== identity) {
       throw new DOMException('Stale request', 'AbortError');
     }

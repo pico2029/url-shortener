@@ -32,6 +32,17 @@ public class LinkService {
         this.transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
+    public void delete(String shortCode, UUID ownerId) {
+        if (ownerId == null) throw new InvalidCredentialsException();
+        try {
+            transaction.executeWithoutResult(status -> {
+                if (repository.deleteOwnedLink(shortCode, ownerId) == 0) throw new LinkNotFoundException();
+            });
+        } catch (DataAccessException | TransactionException exception) {
+            throw new LinkUnavailableException(exception);
+        }
+    }
+
     public CreateLinkResponse create(String originalUrl) {
         return create(originalUrl, null);
     }

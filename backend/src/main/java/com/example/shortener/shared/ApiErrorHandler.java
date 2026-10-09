@@ -1,6 +1,7 @@
 package com.example.shortener.shared;
 
 import com.example.shortener.link.InvalidUrlException;
+import com.example.shortener.link.LinkNotFoundException;
 import com.example.shortener.link.InvalidPageException;
 import com.example.shortener.auth.InvalidCredentialsException;
 import org.springframework.dao.DataAccessException;
@@ -35,6 +36,12 @@ public class ApiErrorHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ApiError aliasAuthentication(com.example.shortener.link.AliasAuthenticationException exception) {
         return new ApiError("UNAUTHORIZED", exception.getMessage(), null);
+    }
+
+    @ExceptionHandler(LinkNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiError notFound() {
+        return new ApiError("LINK_NOT_FOUND", "The link is not available.", null);
     }
 
     @ExceptionHandler(InvalidUrlException.class)

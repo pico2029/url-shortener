@@ -51,6 +51,18 @@ public class LinkController {
         return service.list(ownerId, page, size);
     }
 
+    @DeleteMapping("/{shortCode}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Delete a personal link", description = "Permanently deletes a link owned by the current JWT subject. Missing, anonymous and other users' links all return 404. The public redirect then returns 404.")
+    @ApiResponses({@ApiResponse(responseCode = "204", description = "Link deleted", content = @Content),
+            @ApiResponse(responseCode = "401", description = "Missing, invalid or expired identity", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "404", description = "Link not available to this owner", content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "503", description = "Persistence unavailable", content = @Content(schema = @Schema(implementation = ApiError.class)))})
+    public void delete(@PathVariable String shortCode, @AuthenticationPrincipal Jwt jwt) {
+        service.delete(shortCode, currentUser.requiredId(jwt));
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create a short link", description = "Accepts HTTP/HTTPS URLs up to 8192 characters. A valid Bearer JWT assigns ownership to the current user. Optional aliases require login and 3–32 ASCII letters, numbers, hyphens or underscores, case-sensitive. Surrounding whitespace is stripped; omitted, null or blank aliases generate an eight-character Base62 code. Aliases and generated codes share global uniqueness. Without a token and alias creation is anonymous. Invalid, expired or unknown-user tokens return 401 without insertion. Redirects are public.")

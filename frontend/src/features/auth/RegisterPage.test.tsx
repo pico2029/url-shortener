@@ -58,11 +58,11 @@ describe('registrazione', () => {
     fetchMock.mockResolvedValueOnce(response(201, { id: 'id', email: 'user@example.com', createdAt: 'now' }))
       .mockResolvedValueOnce(response(200, session));
     render(<RegisterPage />);
-    const user = await fill('USER@EXAMPLE.COM', '  una password lunga  ');
+    const user = await fill('USER@EXAMPLE.COM', '  password lunga  ');
     await user.click(screen.getByRole('button', { name: 'Create account' }));
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/dashboard', true));
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/register', expect.objectContaining({
-      body: JSON.stringify({ email: 'user@example.com', password: '  una password lunga  ' }),
+      body: JSON.stringify({ email: 'user@example.com', password: '  password lunga  ' }),
     }));
     expect(screen.getByLabelText('Password')).toHaveValue('');
     expect(screen.getByLabelText('Confirm password')).toHaveValue('');
