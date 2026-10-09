@@ -6,6 +6,7 @@ import { saveSession } from '../features/auth/session';
 
 const fetchMock = vi.fn();
 const session = { accessToken: 'signed-token', tokenType: 'Bearer', expiresAt: new Date(Date.now() + 3600000).toISOString() };
+const emptyPage = { items: [], page: 0, size: 20, totalElements: 0, totalPages: 0 };
 const response = (status: number, body: unknown) => ({ ok: status < 400, status, json: async () => body });
 beforeEach(() => {
   fetchMock.mockReset();
@@ -15,8 +16,8 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-it('accede e naviga alla dashboard con il form autenticato', async () => {
-  fetchMock.mockResolvedValueOnce(response(200, session)).mockResolvedValueOnce(response(200, { email: 'user@example.com' }));
+it('accede e naviga alla dashboard personale', async () => {
+  fetchMock.mockResolvedValueOnce(response(200, session)).mockResolvedValueOnce(response(200, { email: 'user@example.com' })).mockResolvedValueOnce(response(200, emptyPage));
   render(<App />);
   const user = userEvent.setup();
   expect(screen.queryByLabelText('Confirm password')).not.toBeInTheDocument();
@@ -24,10 +25,11 @@ it('accede e naviga alla dashboard con il form autenticato', async () => {
   await user.type(screen.getByLabelText('Email'), 'USER@EXAMPLE.COM');
   await user.type(screen.getByLabelText('Password'), 'una password lunga');
   await user.click(screen.getByRole('button', { name: 'Log in' }));
-  expect(await screen.findByLabelText('Custom alias (optional)')).toBeInTheDocument();
+  await screen.findByText('You have no personal links yet. Create one using the form above.');
+  expect(screen.getByLabelText('Custom alias (optional)')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
   expect(window.location.pathname).toBe('/dashboard');
-  expect(fetchMock).toHaveBeenLastCalledWith('/api/v1/auth/me', expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer signed-token' }) }));
+  expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/me', expect.objectContaining({ headers: expect.objectContaining({ authorization: 'Bearer signed-token' }) }));
 });
 
 it('mostra credenziali errate senza navigare', async () => {
@@ -50,12 +52,12 @@ it('blocca la dashboard senza sessione', async () => {
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-it('mantiene la sessione dopo il refresh e mostra il form autenticato', async () => {
+it('mantiene la sessione dopo il refresh e mostra i link personali', async () => {
   saveSession(session);
   window.history.replaceState(null, '', '/dashboard');
-  fetchMock.mockResolvedValue(response(200, {}));
+  fetchMock.mockResolvedValueOnce(response(200, {})).mockResolvedValueOnce(response(200, emptyPage));
   render(<App />);
-  expect(await screen.findByLabelText('Custom alias (optional)')).toBeInTheDocument();
+  await screen.findByText('You have no personal links yet. Create one using the form above.');
   expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
 });
 
@@ -91,7 +93,8 @@ it('non mostra il form prima della verifica della sessione', async () => {
 it('invia il Bearer e rimuove la sessione se la creazione restituisce 401', async () => {
   saveSession(session);
   window.history.replaceState(null, '', '/dashboard');
-  fetchMock.mockResolvedValueOnce(response(200, {})).mockResolvedValueOnce(response(401, { code: 'UNAUTHORIZED', detail: 'Expired' }));
+  fetchMock.mockResolvedValueOnce(response(200, {})).mockResolvedValueOnce(response(200, emptyPage))
+    .mockResolvedValueOnce(response(401, { code: 'UNAUTHORIZED', detail: 'Expired' }));
   render(<App />);
   const user = userEvent.setup();
   await user.type(await screen.findByLabelText('URL to shorten'), 'https://example.com');
@@ -99,7 +102,7 @@ it('invia il Bearer e rimuove la sessione se la creazione restituisce 401', asyn
   await waitFor(() => expect(window.location.pathname).toBe('/login'));
   expect(sessionStorage.length).toBe(0);
   expect(fetchMock).toHaveBeenLastCalledWith('/api/v1/links', expect.objectContaining({
-    headers: expect.objectContaining({ Authorization: 'Bearer signed-token' }),
+    headers: expect.objectContaining({ authorization: 'Bearer signed-token' }),
     body: JSON.stringify({ originalUrl: 'https://example.com' }),
   }));
 });

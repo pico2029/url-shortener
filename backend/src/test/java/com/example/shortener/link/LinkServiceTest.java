@@ -58,6 +58,24 @@ class LinkServiceTest {
     }
 
     @Test
+    void preservesOwnerAcrossCollisionRetries() {
+        var owner = java.util.UUID.randomUUID();
+        when(repository.saveAndFlush(any())).thenThrow(collision()).thenAnswer(i -> i.getArgument(0));
+        service.create("https://example.com", null, owner);
+        var links = ArgumentCaptor.forClass(Link.class);
+        verify(repository, times(2)).saveAndFlush(links.capture());
+        assertTrue(links.getAllValues().stream().allMatch(link -> owner.equals(link.getOwnerId())));
+    }
+
+    @Test
+    void listFailureUsesServiceUnavailableAndCannotListAnonymousLinks() {
+        when(repository.findByOwnerIdOrderByCreatedAtDescIdDesc(any(), any()))
+                .thenThrow(new DataAccessResourceFailureException("secret"));
+        assertThrows(LinkUnavailableException.class, () -> service.list(java.util.UUID.randomUUID(), 0, 20));
+        assertThrows(com.example.shortener.auth.InvalidCredentialsException.class, () -> service.list(null, 0, 20));
+    }
+
+    @Test
     void stopsAfterFiveCollisions() {
         when(repository.saveAndFlush(any())).thenThrow(collision());
         assertThrows(LinkUnavailableException.class, () -> service.create("https://example.com"));

@@ -28,16 +28,14 @@ Development and verification use Docker Compose, with Nginx serving the React/Ty
 
 ### Current implementation
 
-US01 creates anonymous links through an English React form and `POST /api/v1/links`, validates HTTP/HTTPS destinations, persists eight-character Base62 codes in PostgreSQL and displays full short URLs. Local destinations are allowed; availability is not checked. US02 opens saved links through public `302` redirects, with English HTML pages for missing codes (`404`) and persistence failures (`503`). US03 registration is implemented with a public API, PostgreSQL users migration, password hashing, an English `/register` form, and backend/frontend feature tests. Login and JWT session verification are implemented; registration includes password confirmation and automatically logs in. Both forms lead to a dashboard with authenticated link creation and optional custom aliases (US08). Logout, link ownership and personal management remain unimplemented. Planned capabilities must not be presented as working features.
+US01 creates anonymous links through an English React form and `POST /api/v1/links`, validates HTTP/HTTPS destinations, persists eight-character Base62 codes in PostgreSQL and displays full short URLs. Local destinations are allowed; availability is not checked. US02 opens saved links through public 302 redirects, with English HTML pages for missing codes (404) and persistence failures (503). US03 registration is implemented with a public API, PostgreSQL users migration, password hashing, an English `/register` form, and backend/frontend feature tests. Login and JWT session verification are implemented; registration includes password confirmation and automatically logs in. Both forms lead to an English dashboard with authenticated creation, paginated personal links and client logout. US04 and US05 use token-derived ownership and isolate accounts. US08 adds optional custom aliases to authenticated creation; successful creation refreshes the personal list. Existing and newly anonymous links remain unowned; signing in never claims them. Deletion, copying with one click, expiration and statistics remain unimplemented. Planned capabilities must not be presented as working features.
 
 ### Confirmed product decisions
 
 - Anonymous visitors may create short links. Accounts are used for personal management.
 - Opening short links does not require authentication.
-- Custom aliases require a valid JWT after surrounding whitespace is stripped with Java `String.strip()`. Omitted, null, empty or whitespace-only aliases use automatic generation.
-- Aliases contain 3–32 ASCII letters, numbers, hyphens or underscores, are case-sensitive, and share global uniqueness with generated codes. No words are reserved under `/r/`. Occupied aliases return a comprehensible `409`; invalid aliases return `400`.
-- US08 adds no ownership association: authenticated creation does not yet attach a link to a user.
-- Ownership, recovery, and any later claiming of anonymously created links remain undecided. Do not assume anonymous links automatically belong to a later account.
+- Custom aliases require a valid JWT and 3–32 ASCII letters, numbers, hyphens or underscores after Java String.strip(). Omitted, null or blank aliases generate a code. Case is preserved; aliases and generated codes share global uniqueness with no reserved words. Invalid aliases return 400; occupied aliases return 409.
+- Authenticated creation assigns ownership exclusively from the JWT subject. Recovery and any later claiming of anonymously created links remain undecided. Do not assume anonymous links automatically belong to a later account.
 
 ### Documented implementation scope
 

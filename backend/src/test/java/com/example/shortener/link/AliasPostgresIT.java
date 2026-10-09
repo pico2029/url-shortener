@@ -37,6 +37,7 @@ class AliasPostgresIT {
     @Autowired private MockMvc mvc;
     @Autowired private ObjectMapper mapper;
     @Autowired private JwtEncoder encoder;
+    @Autowired private com.example.shortener.user.UserRepository users;
     @MockitoSpyBean private ShortCodeGenerator generator;
 
     @Test
@@ -53,6 +54,7 @@ class AliasPostgresIT {
                 .andExpect(header().string("Location", "https://example.com/alias"))
                 .andExpect(content().string(""));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM links WHERE short_code = ?", Integer.class, alias));
+        assertNotNull(jdbc.queryForObject("SELECT owner_id FROM links WHERE short_code = ?", UUID.class, alias));
     }
 
     @Test
@@ -135,7 +137,8 @@ class AliasPostgresIT {
 
     private String token() {
         Instant now = Instant.now();
-        var claims = JwtClaimsSet.builder().issuer(TokenService.ISSUER).subject(UUID.randomUUID().toString())
+        var user = users.saveAndFlush(new com.example.shortener.user.User(UUID.randomUUID() + "@example.com", "test-only-hash"));
+        var claims = JwtClaimsSet.builder().issuer(TokenService.ISSUER).subject(user.getId().toString())
                 .issuedAt(now).expiresAt(now.plusSeconds(3600)).build();
         return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
     }

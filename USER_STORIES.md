@@ -2,7 +2,7 @@
 
 ## Stato del progetto
 
-Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard con form di creazione autenticata. US01 aggiunge creazione anonima di link, validazione HTTP/HTTPS, codici Base62 univoci e persistenza PostgreSQL tramite API e form React. US02 aggiunge redirect pubblici `302` e pagine HTML inglesi per codici inesistenti (`404`) e indisponibilità della persistenza (`503`). US08 aggiunge alias personalizzati facoltativi per utenti autenticati. Logout, proprietà dei link e gestione personale restano da implementare.
+Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard inglese con creazione autenticata, elenco personale paginato e pulsante Log out. US01 aggiunge creazione anonima di link, validazione HTTP/HTTPS, codici Base62 univoci e persistenza PostgreSQL tramite API e form React. US04 e US05 includono logout locale, scadenza della sessione e isolamento dei link per proprietario. US02 aggiunge redirect pubblici `302` e pagine HTML inglesi per codici inesistenti (`404`) e persistenza indisponibile (`503`). US08 aggiunge alias personalizzati facoltativi alla creazione autenticata. Copia con un clic, eliminazione e statistiche restano da implementare.
 
 Questo documento definisce il lavoro necessario per realizzare le funzionalità previste nel [README](README.md): link brevi, account, dashboard, alias personalizzati, scadenza, cache, limiti delle richieste e statistiche. Il deployment pubblico resta fuori dal perimetro attuale.
 
@@ -77,6 +77,8 @@ Criteri di accettazione:
 
 ### US04 — Accedere e uscire
 
+**Implementata:** logout locale, annullamento richieste, verifica server, scadenza e protezione da risposte tardive.
+
 **Come utente registrato, voglio accedere al mio account e uscire dalla sessione, per utilizzare le funzionalità personali.**
 
 Responsabile: P2.
@@ -89,6 +91,8 @@ Criteri di accettazione:
 - Il logout rimuove la sessione dal client.
 
 ### US05 — Visualizzare i propri link
+
+**Implementata:** proprietà derivata dal JWT, migrazione V4 senza assegnare i link anonimi, elenco paginato e dashboard inglese. Stato attuale `SAVED` (“Saved”), con redirect pubblici forniti da US02.
 
 **Come utente autenticato, voglio vedere i link che ho creato, per consultarli e gestirli.**
 
@@ -128,7 +132,7 @@ Criteri di accettazione:
 
 ### US08 — Scegliere un alias
 
-Implementata: `POST /api/v1/links` accetta `alias` facoltativo. Dopo `String.strip()`, valori omessi, null o vuoti generano un codice Base62 di 8 caratteri; un alias non vuoto richiede JWT e 3–32 caratteri ASCII tra lettere, numeri, `-` e `_`. Maiuscole e minuscole restano distinte, senza parole riservate. Alias e codici generati condividono l'unicità globale PostgreSQL: collisioni esplicite restituiscono `409 ALIAS_ALREADY_TAKEN`, alias invalidi `400 INVALID_ALIAS`, assenza di login `401`. La dashboard riusa il form e gestisce gli errori; i redirect restano pubblici. US08 non introduce proprietà dei link, elenco, eliminazione, scadenza o cache. Il contratto completo è documentato nel README.
+Implementata: `POST /api/v1/links` accetta `alias` facoltativo. Dopo `String.strip()`, valori omessi, null o vuoti generano un codice Base62 di 8 caratteri; un alias non vuoto richiede JWT e 3–32 caratteri ASCII tra lettere, numeri, `-` e `_`. Maiuscole e minuscole restano distinte, senza parole riservate. Alias e codici generati condividono l'unicità globale PostgreSQL: collisioni esplicite restituiscono `409 ALIAS_ALREADY_TAKEN`, alias invalidi `400 INVALID_ALIAS`, assenza di login `401`. La dashboard riusa il form e gestisce gli errori; i redirect restano pubblici. Gli alias si integrano con proprietà ed elenco di US05: il JWT determina il proprietario e la dashboard aggiorna la lista dopo la creazione. Eliminazione, scadenza e cache restano pianificate. Il contratto completo è documentato nel README.
 
 **Come utente autenticato, voglio scegliere un codice personalizzato, per ottenere un link riconoscibile.**
 
@@ -225,6 +229,6 @@ Una User Story è completata quando:
 - La funzionalità è utilizzabile attraverso Docker Compose e il proxy Nginx.
 - L'interfaccia gestisce gli stati di caricamento, successo ed errore applicabili.
 
-Lo script [scripts/verify.sh](scripts/verify.sh) verifica creazione anonima, redirect pubblici `302`, pagina `404`, registrazione e persistenza di link e utenti dopo la ricreazione dei container, inclusa l'apertura del link persistito. Le API private e Swagger/OpenAPI continuano a restituire `401` senza autenticazione; aggiornare le verifiche con l'implementazione delle storie successive.
+Lo script [scripts/verify.sh](scripts/verify.sh) verifica creazione anonima, registrazione, login, isolamento di due account e persistenza di link e utenti dopo la ricreazione dei container. Verifica anche redirect pubblici `302`, pagina `404` e apertura del link persistito. Le API private e Swagger/OpenAPI restano protetti con `401`; aggiornare le verifiche con l'implementazione delle storie successive.
 
 Il progetto è completato quando due utenti possono registrarsi, creare e gestire separatamente i propri link; redirect, alias, scadenze, cache, limiti e statistiche funzionano; i test passano e il README descrive l'app reale.

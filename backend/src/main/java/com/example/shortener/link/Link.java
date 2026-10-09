@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "links")
@@ -21,14 +22,25 @@ public class Link {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "owner_id")
+    private UUID ownerId;
+
     protected Link() {
     }
 
     Link(String originalUrl, String shortCode) {
+        this(originalUrl, shortCode, null);
+    }
+
+    Link(String originalUrl, String shortCode, UUID ownerId) {
+        this.ownerId = ownerId;
         this.originalUrl = originalUrl;
         this.shortCode = shortCode;
         this.createdAt = Instant.now();
     }
+
+    public UUID getOwnerId() { return ownerId; }
+    public Instant getCreatedAt() { return createdAt; }
 
     public String getOriginalUrl() {
         return originalUrl;

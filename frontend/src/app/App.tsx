@@ -1,55 +1,7 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { CreateLinkForm } from '../features/links/CreateLinkForm';
 import { AuthForm } from '../features/auth/AuthForm';
-import { clearSession, readSession } from '../features/auth/session';
-import { ApiError, getJson } from '../shared/api';
-import { navigate } from '../shared/navigation';
-
-function DashboardPage() {
-  const [token, setToken] = useState<string>();
-  const [status, setStatus] = useState<'checking' | 'ready' | 'error'>('checking');
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let active = true;
-    const session = readSession();
-    if (!session) {
-      navigate('/login', true);
-      return;
-    }
-    const expiry = window.setTimeout(() => {
-      clearSession();
-      navigate('/login', true);
-    }, Math.max(0, Date.parse(session.expiresAt) - Date.now()));
-    setStatus('checking');
-    getJson('/api/v1/auth/me', session.accessToken).then(() => {
-      if (active) {
-        setToken(session.accessToken);
-        setStatus('ready');
-      }
-    }).catch(error => {
-      if (!active) return;
-      if (error instanceof ApiError && error.problem.status === 401) {
-        clearSession();
-        navigate('/login', true);
-      } else setStatus('error');
-    });
-    return () => { active = false; window.clearTimeout(expiry); };
-  }, [attempt]);
-
-  return <main>
-    <h1>Dashboard</h1>
-    {status === 'ready' && token && <CreateLinkForm token={token} onUnauthorized={() => {
-      clearSession();
-      navigate('/login', true);
-    }} />}
-    {status === 'checking' && <p role="status">Checking your session…</p>}
-    {status === 'error' && <>
-      <p role="alert">Your session could not be verified.</p>
-      <button onClick={() => setAttempt(value => value + 1)}>Try again</button>
-    </>}
-  </main>;
-}
+import { DashboardPage } from '../features/links/DashboardPage';
 
 function subscribeNavigation(update: () => void) {
   window.addEventListener('popstate', update);
