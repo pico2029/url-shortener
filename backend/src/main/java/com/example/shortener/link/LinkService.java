@@ -20,26 +20,38 @@ public class LinkService {
     private final ShortCodeGenerator generator;
     private final LinkProperties properties;
     private final TransactionTemplate transaction;
+    private final RedirectCache cache;
+    private final LinkCacheCoordinator coordinator;
 
     public LinkService(LinkRepository repository, UrlValidator validator, ShortCodeGenerator generator,
-            LinkProperties properties, PlatformTransactionManager transactionManager, AliasValidator aliases) {
+            LinkProperties properties, PlatformTransactionManager transactionManager, AliasValidator aliases,
+            RedirectCache cache, LinkCacheCoordinator coordinator) {
         this.repository = repository;
         this.validator = validator;
         this.aliases = aliases;
         this.generator = generator;
         this.properties = properties;
+        this.cache = cache;
+        this.coordinator = coordinator;
         this.transaction = new TransactionTemplate(transactionManager);
         this.transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     public void delete(String shortCode, UUID ownerId) {
         if (ownerId == null) throw new InvalidCredentialsException();
+        var group = coordinator.group(shortCode);
+        var lock = group.lock.writeLock();
+        lock.lock();
         try {
             transaction.executeWithoutResult(status -> {
                 if (repository.deleteOwnedLink(shortCode, ownerId) == 0) throw new LinkNotFoundException();
             });
+            cache.invalidate(shortCode, group, group.generation());
         } catch (DataAccessException | TransactionException exception) {
+            group.abandon(group.generation());
             throw new LinkUnavailableException(exception);
+        } finally {
+            lock.unlock();
         }
     }
 

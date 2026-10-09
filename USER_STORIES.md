@@ -50,7 +50,7 @@ Criteri di accettazione:
 
 ### US02 — Aprire un link breve
 
-Implementata: `GET` e `HEAD /r/{shortCode}` pubblici, ricerca esatta e sensibile alle maiuscole su PostgreSQL, `Location` con destinazione originale e `Cache-Control: no-store`. Nessuna cache, statistica o scadenza anticipata. Gli errori `404` e `503` restituiscono pagine HTML inglesi accessibili senza JavaScript. Parametri aggiunti al link breve non vengono trasferiti alla destinazione.
+Implementata: `GET` e `HEAD /r/{shortCode}` pubblici, ricerca esatta e sensibile alle maiuscole su PostgreSQL, `Location` con destinazione originale e `Cache-Control: no-store`. US11 aggiunge cache Redis facoltativa con fallback PostgreSQL; statistiche e scadenza restano da implementare. Gli errori `404` e `503` restituiscono pagine HTML inglesi accessibili senza JavaScript. Parametri aggiunti al link breve non vengono trasferiti alla destinazione.
 
 **Come visitatore, voglio aprire un link breve, per raggiungere la pagina originale.**
 
@@ -125,7 +125,7 @@ Criteri di accettazione:
 
 **Implementata per l’architettura attuale; verifica browser finale da completare:** `DELETE /api/v1/links/{shortCode}` autenticato, cancellazione transazionale condizionata da codice e proprietario JWT, `204` dopo commit e `404 LINK_NOT_FOUND` indistinguibile per link inesistenti, anonimi, altrui o già eliminati. Dashboard con conferma inline, gestione focus, errore/riprova e aggiornamento della pagina valida dopo eliminazione. I redirect eliminati restituiscono `404`.
 
-**Dipendenza US11:** attualmente i redirect non usano Redis. Quando verrà implementata la cache, invalidare le sue chiavi reali e impedire reinserimenti concorrenti di link eliminati. Nessuna invalidazione Redis speculativa è introdotta da US07.
+**Integrazione US11:** dopo il commit, eliminazione e risoluzione condividono lock locali per impedire reinserimenti obsoleti. La chiave Redis viene invalidata prima del 204; se Redis non risponde, il namespace interessato viene abbandonato. Richieste iniziate dopo il 204 restituiscono 404; redirect già in corso possono completarsi. La garanzia riguarda il singolo backend e le modifiche eseguite tramite applicazione.
 
 **Verifica:** sei scenari mirati aggiunti (tre backend, uno parametrizzato; tre frontend). Superati 23 test unitari backend, 13 verifiche con PostgreSQL, 31 test frontend pertinenti e build frontend. Test di registrazione allineati ai limiti attuali: suite frontend completa superata (41 test), build Docker standard superata (57 test unitari backend) e servizi aggiornati avviati sani nello stack normale. Verifica nel browser di conferma, tastiera e layout da completare: strumenti browser indisponibili/non autorizzati nella sessione.
 
@@ -142,7 +142,7 @@ Criteri di accettazione:
 
 ### US08 — Scegliere un alias
 
-Implementata: `POST /api/v1/links` accetta `alias` facoltativo. Dopo `String.strip()`, valori omessi, null o vuoti generano un codice Base62 di 8 caratteri; un alias non vuoto richiede JWT e 3–32 caratteri ASCII tra lettere, numeri, `-` e `_`. Maiuscole e minuscole restano distinte, senza parole riservate. Alias e codici generati condividono l'unicità globale PostgreSQL: collisioni esplicite restituiscono `409 ALIAS_ALREADY_TAKEN`, alias invalidi `400 INVALID_ALIAS`, assenza di login `401`. La dashboard riusa il form e gestisce gli errori; i redirect restano pubblici. Gli alias si integrano con proprietà ed elenco di US05: il JWT determina il proprietario e la dashboard aggiorna la lista dopo la creazione. Eliminazione, scadenza e cache restano pianificate. Il contratto completo è documentato nel README.
+Implementata: `POST /api/v1/links` accetta `alias` facoltativo. Dopo `String.strip()`, valori omessi, null o vuoti generano un codice Base62 di 8 caratteri; un alias non vuoto richiede JWT e 3–32 caratteri ASCII tra lettere, numeri, `-` e `_`. Maiuscole e minuscole restano distinte, senza parole riservate. Alias e codici generati condividono l'unicità globale PostgreSQL: collisioni esplicite restituiscono `409 ALIAS_ALREADY_TAKEN`, alias invalidi `400 INVALID_ALIAS`, assenza di login `401`. La dashboard riusa il form e gestisce gli errori; i redirect restano pubblici. Gli alias si integrano con proprietà ed elenco di US05: il JWT determina il proprietario e la dashboard aggiorna la lista dopo la creazione. Eliminazione e cache Redis sono implementate; scadenza resta pianificata. Il contratto completo è documentato nel README.
 
 **Come utente autenticato, voglio scegliere un codice personalizzato, per ottenere un link riconoscibile.**
 
@@ -183,6 +183,8 @@ Criteri di accettazione:
 - Il raggruppamento giornaliero usa un fuso orario documentato.
 
 ### US11 — Avere redirect rapidi
+
+**Implementata nel perimetro concordato; criterio scadenza ancora aperto:** cache dei redirect validi con TTL configurabile (5 minuti), hit senza query PostgreSQL e senza rinnovo del TTL, fallback su miss o errore Redis. Coordinamento locale in 256 gruppi di lock e namespace per processo/generazione proteggono eliminazione, recupero Redis e riavvio backend. Timeout Redis predefiniti: 100 ms per connessione e comando. Redis non blocca avvio o salute del backend. Nessuna cache negativa. Il record interno predispone expiresAt e TTL limitato alla durata residua, ma US09 deve ancora aggiungere persistenza, controllo PostgreSQL e risposta 410. Nessuna modifica frontend o migrazione US11. Verifica con test unitari, concorrenza deterministica, PostgreSQL/Redis Testcontainers e smoke test Nginx; nessun obiettivo numerico di latenza.
 
 **Come visitatore, voglio che i link si aprano rapidamente, per raggiungere subito la destinazione.**
 

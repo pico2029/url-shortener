@@ -4,13 +4,13 @@ A URL-shortener project built with a **Java/Spring Boot backend**, a **React/Typ
 
 ## Project status
 
-The project implements US01–US08: anonymous and authenticated creation, registration, JWT login, client logout, a personal dashboard, one-click link copying and owner-only deletion and custom aliases. Statistics remain planned.
+The project implements US01–US08: anonymous and authenticated creation, registration, JWT login, client logout, a personal dashboard, one-click link copying and owner-only deletion and custom aliases. US11 adds Redis redirect caching for the current single backend; expiration, rate limiting and statistics remain planned.
 
 | Available | To be implemented |
 |---|---|
-| Link creation, public redirects, personal listing, deletion and account APIs | Custom aliases and expiration |
+| Link creation, public redirects, custom aliases, personal listing, deletion and account APIs | Expiration |
 | English home, account forms, personal dashboard, copying and deletion | Statistics UI |
-| PostgreSQL and Redis configuration | Application caching and rate limiting |
+| PostgreSQL persistence and Redis redirect caching | Rate limiting |
 | Flyway users/links migrations and JPA persistence | Remaining domain migrations |
 | Registration, JWT login, expiry and client logout | JWT revocation (outside current scope) |
 | Authentication endpoint documentation, Swagger UI, and health checks | Documentation for remaining endpoints |
@@ -75,7 +75,7 @@ frontend / Nginx :80
 
 The `ingress` network connects the frontend and backend. The internal `data` network connects the backend, PostgreSQL, and Redis. The frontend does not access the data services directly.
 
-Health checks ensure that PostgreSQL and Redis are healthy before the backend starts, and that the backend is healthy before the frontend starts. Actuator exposes `/actuator/health` internally, checking both the database and Redis without revealing sensitive details. Nginx blocks external access to this endpoint and exposes `/healthz` for its own health check.
+Health checks ensure that PostgreSQL is healthy before the backend starts, and that the backend is healthy before the frontend starts. Redis is optional for backend startup and health: redirects fall back to PostgreSQL when it is unavailable. Redis retains its own container health check. Actuator exposes `/actuator/health` internally, checking the database without revealing sensitive details. Nginx blocks external access to this endpoint and exposes `/healthz` for its own health check. `docker compose up --wait` still checks Redis and may report failure even while the backend remains usable; to start without Redis, use `docker compose up -d postgres backend frontend`.
 
 The Dockerfiles use multi-stage builds: Maven/JDK produces the JAR executed by Java, while Node/npm produces the static files served by Nginx. Maven and npm do not need to be installed on the host.
 
@@ -227,6 +227,10 @@ The application starts with local defaults without requiring a `.env` file. To c
 | `POSTGRES_PASSWORD` | `shortener-local` | Local PostgreSQL password |
 | `SHORTENER_PUBLIC_BASE_URL` | `http://localhost:${PUBLIC_PORT}` | Public HTTP/HTTPS origin used in returned short links |
 | `JWT_SECRET` | Empty; a random signing key is generated at startup | Optional Base64-encoded signing secret of at least 32 bytes; retains token validity across backend restarts |
+| `REDIRECT_CACHE_ENABLED` | `true` | Enable optional Redis redirect caching |
+| `REDIRECT_CACHE_TTL` | `5m` | Positive cache lifetime, at least 1ms; hits do not renew it |
+| `REDIS_CONNECT_TIMEOUT` | `100ms` | Redis connection timeout |
+| `REDIS_TIMEOUT` | `100ms` | Redis command timeout |
 
 Default credentials are for local development only. Compose passes `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, and `JWT_SECRET` to the backend. The names `postgres` and `redis` are internal Docker addresses. Frontend API calls use relative `/api/v1/*` paths through Nginx.
 
@@ -244,7 +248,7 @@ bash scripts/verify.sh
 
 The script uses Docker to verify:
 
-- Backend health, including PostgreSQL and Redis connectivity.
+- Backend health, including PostgreSQL connectivity; Redis is optional.
 - The home, registration, login and dashboard HTML entry points and the presence of compiled React content. Browser interaction is covered separately by frontend tests and manual checks.
 - Forwarding of protected API, Swagger, and OpenAPI GET requests to the backend, with `401` expected without authentication.
 - Public redirects through Nginx: `302` with the original `Location` and `Cache-Control: no-store`, plus an English HTML `404` for a missing code.
@@ -275,6 +279,7 @@ docker run --rm --mount "type=bind,source=$PWD/frontend,target=/workspace" -w /w
 | `POST` | `/api/v1/links` | Optional Bearer JWT; required for a nonblank alias | Create an anonymous or personal link, with an optional custom alias |
 | `GET`, `HEAD` | `/r/{shortCode}` | Public | `302` to the destination; HTML `404` if absent and `503` if persistence is unavailable |
 | `GET` | `/api/v1/links?page=0&size=20` | Bearer JWT | List only the current user’s links |
+| `DELETE` | `/api/v1/links/{shortCode}` | Bearer JWT | Permanently delete a personal link and invalidate its cached redirect |
 | `POST` | `/api/v1/auth/register` | Public | Create an account; return `201` with its public fields |
 | `POST` | `/api/v1/auth/login` | Public | Verify credentials; return `200` with a JWT and expiry |
 | `GET` | `/api/v1/auth/me` | Bearer JWT | Return the authenticated user's public fields |
@@ -287,7 +292,6 @@ These endpoints **have not been implemented yet**:
 
 | Method | Path | Future behavior |
 |---|---|---|
-| `DELETE` | `/api/v1/links/{shortCode}` | Delete a link |
 | `GET` | `/api/v1/links/{shortCode}/stats` | Retrieve link statistics |
 
 The `/r/` prefix separates short links from SPA pages. Nginx already reserves these paths: API and redirect requests do not receive the frontend HTML fallback.
@@ -296,8 +300,8 @@ The `/r/` prefix separates short links from SPA pages. Nginx already reserves th
 
 1. **Core links:** creation, persistence and public `302` redirects (US01–US02) are implemented.
 2. **Backend foundations:** extend the existing account migration, validation, error handling, tests and API documentation to link features.
-3. **Performance:** Redis caching with TTL and rate limiting.
-4. **Account management:** add deletion and automatic copying to the implemented personal dashboard with custom aliases.
+3. **Performance:** Redis caching with TTL is implemented for a single backend; rate limiting remains planned.
+4. **Account management:** deletion, automatic copying and custom aliases are implemented in the personal dashboard.
 5. **Analytics:** click events, expiration, and statistics.
 
 Hot reload, CI workflows, public deployment, Kafka, Kubernetes, and advanced monitoring are outside the current implementation scope.
@@ -369,7 +373,7 @@ Link API errors retain `{code, message, field}`, including `401` for missing, in
 
 PostgreSQL's existing `uk_links_short_code` constraint guarantees uniqueness under concurrency. An explicit alias is inserted once: a collision returns `409`, without generating another code. Automatic codes retain up to five attempts in separate transactions. Success is returned only after commit. The dashboard focuses alias errors and preserves input on validation, conflict or service failure; `401` clears the session and returns to login.
 
-Alias creation integrates with ownership and listing from US05: a JWT associates the new link with the current user and the dashboard refreshes the personal list. Existing anonymous links remain unowned. Deletion, expiration and Redis caching remain planned.
+Alias creation integrates with ownership and listing from US05: a JWT associates the new link with the current user and the dashboard refreshes the personal list. Existing anonymous links remain unowned. Deletion and Redis caching are implemented; expiration remains planned.
 
 ## US02 — Open a short link
 
@@ -387,7 +391,7 @@ Location: https://example.com/a-long-path?query=value#section
 Cache-Control: no-store
 ```
 
-Resolution reads PostgreSQL in a read-only transaction. Codes are case-sensitive and are looked up without trimming, case conversion or a new length restriction. Destination paths, queries, fragments and existing percent escapes are preserved; Unicode characters are encoded as an ASCII URI without double encoding. Query parameters added to the short URL are not forwarded. The destination is never fetched or checked for availability.
+Resolution first checks Redis. A cache miss or cache failure reads PostgreSQL in a read-only transaction; a successful lookup populates Redis after the transaction ends. Codes are case-sensitive and are looked up without trimming, case conversion or a new length restriction. Destination paths, queries, fragments and existing percent escapes are preserved; Unicode characters are encoded as an ASCII URI without double encoding. Query parameters added to the short URL are not forwarded. The destination is never fetched or checked for availability.
 
 A missing code returns `404` with `Content-Type: text/html; charset=UTF-8`, the English title “Link not found”, an explanation and a “Back to home” link. Database or transaction failures return an English HTML `503 Service unavailable` page without internal details. Error responses have no `Location`. All these responses use `Cache-Control: no-store`. `HEAD` is public and returns the corresponding status and headers without a body.
 
@@ -443,13 +447,13 @@ Without host Maven, use the dedicated runner from the repository root:
 # Unit tests only, also run during the backend image build
 docker compose --profile test run --rm backend-tests mvn -B -ntp verify
 
-# Unit tests and real PostgreSQL integration tests — required for account and link features
+# Unit tests and real PostgreSQL/Redis integration tests — required for account and link features
 docker compose --profile test run --rm backend-tests mvn -B -ntp verify -Pintegration
 ```
 
 The integration profile runs both tagged authentication tests through Surefire and link `*IT` tests through Failsafe. `bash scripts/test-integration.sh` is an alternative Docker runner.
 
-The optional `backend-tests` service mounts the backend checkout, a Maven cache and the Docker socket. It uses `host.docker.internal` for Docker Desktop; `extra_hosts` provides the host gateway on Linux. It pins the docker-java API to 1.44 for compatibility with Docker 29; override `DOCKER_API_VERSION` if necessary. Testcontainers creates a separate temporary PostgreSQL instance and removes it afterward; it does not use the application's data volume. The profile is not started with ordinary `docker compose up`.
+The optional `backend-tests` service mounts the backend checkout, a Maven cache and the Docker socket. It uses `host.docker.internal` for Docker Desktop; `extra_hosts` provides the host gateway on Linux. It pins the docker-java API to 1.44 for compatibility with Docker 29; override `DOCKER_API_VERSION` if necessary. Testcontainers creates temporary PostgreSQL and Redis instances and removes them afterward; it does not use the application's data volume. Existing PostgreSQL-only tests disable redirect caching explicitly. The profile is not started with ordinary `docker compose up`.
 
 Frontend tests and build:
 
@@ -518,7 +522,7 @@ The dashboard offers “Delete link”, followed by an inline permanent-deletion
 
 After deletion, the current page is reloaded. If that page is empty, the last valid page is loaded. A failed DELETE preserves the link and allows retry; a failed refresh after successful deletion explicitly reports that deletion succeeded and offers a list reload. A 404 DELETE reports that the link is unavailable and reloads the list. Public GET/HEAD redirects subsequently return 404.
 
-Redis does not yet cache redirects. US11 must invalidate the actual cache entries when deleting and prevent a concurrent resolution from repopulating a deleted link; this change introduces no speculative Redis keys or cache.
+US11 invalidates the actual cached redirect after the deletion commits and before returning 204. Local coordination prevents concurrent resolutions from repopulating deleted entries. If Redis invalidation fails, the affected namespace is abandoned so recovery cannot revive a deleted redirect. A redirect already in progress may complete; requests starting after 204 return 404.
 
 Six focused US07 test scenarios were added: three backend scenarios (one parameterized) and three frontend scenarios. The relevant backend command is:
 
@@ -529,3 +533,27 @@ docker compose --profile test run --rm backend-tests mvn -B -ntp verify -Pintegr
 It passed 23 unit tests and 13 PostgreSQL integration checks. Frontend feature/session/navigation checks passed 31 tests and the frontend build passed. After aligning registration test fixtures with the current validation rules, the full frontend suite passes all 41 tests. Real-browser confirmation, keyboard and visual verification remain pending because browser automation was unavailable/not authorized in this session.
 
 The standard Docker build now passes all 57 backend unit tests. `docker compose up --build -d --wait --wait-timeout 180` successfully started the updated backend and frontend; Delete link is included in the served dashboard bundle.
+
+## US11 — Fast redirects with Redis
+
+Valid resolutions use Redis first and fall back to PostgreSQL on a miss, malformed payload or cache failure. Successful database lookups populate Redis outside the read-only transaction. Only successful resolutions are cached; missing codes and database errors are not. An existing cache hit needs no database query, and remains usable during a PostgreSQL outage. A database failure on a miss retains the HTML 503 response.
+
+The default TTL is five minutes and is not renewed on hits. Set `REDIRECT_CACHE_TTL` to change it, or `REDIRECT_CACHE_ENABLED=false` to bypass Redis. Connection and command timeouts default to 100ms each. These bound the respective Redis operations, not total HTTP latency, which also includes database access and coordination. Keys use `shortener:redirect:v1:<process>:<group>:<generation>:<exact-code>` and JSON stores only a version, the original URL and optional expiration. URLs and authentication data are never logged by the cache; cache warnings are limited to one per 30 seconds.
+
+The single backend shares 256 fair read/write lock groups between resolution and deletion. Deletion waits for earlier resolutions, commits to PostgreSQL, and invalidates the actual Redis key before returning 204. Failed cache operations abandon the group's namespace, preventing old entries from being read after recovery and preventing late writes from entering a new generation. Obsolete keys expire normally; no database-wide Redis flush is used. Backend startup generates a new process namespace. Failed deletion commits also abandon the namespace in case the database outcome is uncertain.
+
+Requests beginning after a successful deletion return 404; redirects already in progress may finish with 302. Alias reuse resolves the new destination. This guarantee covers application operations in one backend process, including Redis outages and restart; multiple concurrent backends and external SQL mutations require a different consistency design.
+
+US09 remains unimplemented. The cache has a clock-testable expiration policy: a future `expiresAt` limits TTL to the remaining lifetime and expired entries cannot be hits. Current database resolutions supply no expiration. Persisting expiration, checking it on PostgreSQL reads, exposing it through the API/UI and returning 410 remain US09 work; the expiration acceptance criterion of US11 is still open. No schema migration or frontend change is introduced here, and click analytics remain planned.
+
+Run unit and integration tests using the commands above. Integration tests use temporary PostgreSQL and Redis containers, including a paused Redis and a restored pre-outage cache snapshot to verify the case where invalidation was lost, and verify startup with Redis unreachable. To verify the actual built Compose stack through Nginx on Windows:
+
+```powershell
+./scripts/verify-redirect-cache.ps1
+# For a different public port/origin:
+./scripts/verify-redirect-cache.ps1 -BaseUrl http://localhost:8081
+```
+
+This smoke test requires an already running stack with caching enabled. It briefly pauses/stops Redis and recreates the backend, which invalidates existing JWTs when `JWT_SECRET` is unset. It restores Redis afterward and retains database volumes and existing data. Each run leaves one synthetic account and two links. It checks TTL, deletion during an outage, alias reuse, namespaces across backend recreation, and healthy startup without Redis. Functional acceptance proves that cache hits avoid PostgreSQL; no hardware-dependent latency threshold is asserted.
+
+US11 verification passed 84 unit tests and 34 integration tests (9 authentication and 25 link/cache scenarios), Compose validation, both Docker image builds and the Nginx smoke test above. The real Redis behavioral suite uses 1s timeouts to allow Docker Desktop host-gateway scheduling; application defaults and the startup-without-Redis test retain 100ms. Existing registration integration fixtures were aligned with the current 6–18-character password contract. No database volumes were removed.

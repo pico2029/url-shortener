@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @Tag("integration")
 @Testcontainers
-@SpringBootTest(properties = "management.health.redis.enabled=false")
+@SpringBootTest(properties = "shortener.redirect-cache.enabled=false")
 @AutoConfigureMockMvc
 class RegistrationIntegrationTest {
     @Container
@@ -52,7 +52,7 @@ class RegistrationIntegrationTest {
 
     @Test
     void createsAnonymousAccountAndReturnsOnlyPublicFields() throws Exception {
-        MvcResult result = register("  USER@Example.COM ", "  password lunga 🔐  ")
+        MvcResult result = register("  USER@Example.COM ", "  password 🔐  ")
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.email").value("user@example.com"))
                 .andExpect(jsonPath("$.id").isString()).andExpect(jsonPath("$.createdAt").isString())
                 .andExpect(jsonPath("$.password").doesNotExist())
@@ -62,8 +62,8 @@ class RegistrationIntegrationTest {
         assertEquals(3, response.size());
         assertTrue(response.get("createdAt").asText().endsWith("Z"));
         User user = users.findAll().getFirst();
-        assertTrue(encoder.matches("  password lunga 🔐  ", user.getPasswordHash()));
-        assertFalse(encoder.matches("password lunga 🔐", user.getPasswordHash()));
+        assertTrue(encoder.matches("  password 🔐  ", user.getPasswordHash()));
+        assertFalse(encoder.matches("password 🔐", user.getPasswordHash()));
     }
 
     @Test
@@ -77,7 +77,7 @@ class RegistrationIntegrationTest {
 
     @Test
     void validatesInputsAndMalformedJsonWithoutPersisting() throws Exception {
-        for (String password : List.of("", "a".repeat(14), "a".repeat(129))) {
+        for (String password : List.of("", "a".repeat(5), "a".repeat(19))) {
             register("a@example.com", password).andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.fieldErrors.password").isString());
         }
@@ -94,7 +94,7 @@ class RegistrationIntegrationTest {
 
     @Test
     void acceptsPasswordBoundariesAndSpaces() throws Exception {
-        for (int length : new int[]{15, 128}) {
+        for (int length : new int[]{6, 18}) {
             register("user" + length + "@example.com", " ".repeat(length)).andExpect(status().isCreated());
         }
     }
@@ -114,9 +114,9 @@ class RegistrationIntegrationTest {
 
     @Test
     void logsInWithExistingAccountAndAuthorizesMe() throws Exception {
-        register("user@example.com", "  una password lunga  ").andExpect(status().isCreated());
+        register("user@example.com", "  una password  ").andExpect(status().isCreated());
         MvcResult result = mvc.perform(post("/api/v1/auth/login").contentType("application/json")
-                .content(mapper.writeValueAsBytes(Map.of("email", " USER@EXAMPLE.COM ", "password", "  una password lunga  "))))
+                .content(mapper.writeValueAsBytes(Map.of("email", " USER@EXAMPLE.COM ", "password", "  una password  "))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.expiresAt").isString()).andReturn();
         assertNull(result.getResponse().getHeader("Set-Cookie"));
@@ -131,10 +131,10 @@ class RegistrationIntegrationTest {
 
     @Test
     void wrongAndUnknownCredentialsHaveTheSameResponse() throws Exception {
-        register("user@example.com", "  una password lunga  ").andExpect(status().isCreated());
+        register("user@example.com", "  una password  ").andExpect(status().isCreated());
         for (String email : List.of("user@example.com", "unknown@example.com")) {
             mvc.perform(post("/api/v1/auth/login").contentType("application/json")
-                    .content(mapper.writeValueAsBytes(Map.of("email", email, "password", "una password lunga"))))
+                    .content(mapper.writeValueAsBytes(Map.of("email", email, "password", "una password"))))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
         }

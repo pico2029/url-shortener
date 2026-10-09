@@ -1,5 +1,8 @@
 shortener:
   public-base-url: ${SHORTENER_PUBLIC_BASE_URL:http://localhost:8080}
+  redirect-cache:
+    enabled: ${REDIRECT_CACHE_ENABLED:true}
+    ttl: ${REDIRECT_CACHE_TTL:5m}
 spring:
   application:
     name: url-shortener
@@ -18,9 +21,12 @@ spring:
     redis:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
-      connect-timeout: 2s
-      timeout: 2s
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:100ms}
+      timeout: ${REDIS_TIMEOUT:100ms}
 management:
+  health:
+    redis:
+      enabled: false
   endpoints:
     web:
       exposure:

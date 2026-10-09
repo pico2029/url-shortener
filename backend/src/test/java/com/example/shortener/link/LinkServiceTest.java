@@ -25,7 +25,8 @@ class LinkServiceTest {
         when(transactions.getTransaction(any())).thenAnswer(invocation -> new SimpleTransactionStatus());
         when(generator.generate()).thenReturn("aB3dE7fG", "bB3dE7fG");
         service = new LinkService(repository, new UrlValidator(), generator,
-                new LinkProperties(URI.create("http://localhost:8080")), transactions, new AliasValidator());
+                new LinkProperties(URI.create("http://localhost:8080")), transactions, new AliasValidator(),
+                mock(RedirectCache.class), new LinkCacheCoordinator());
     }
 
     @Test
