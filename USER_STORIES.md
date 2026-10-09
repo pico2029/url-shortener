@@ -50,7 +50,7 @@ Criteri di accettazione:
 
 ### US02 — Aprire un link breve
 
-Implementata: `GET` e `HEAD /r/{shortCode}` pubblici, ricerca esatta e sensibile alle maiuscole su PostgreSQL, `Location` con destinazione originale e `Cache-Control: no-store`. Nessuna cache, statistica o scadenza anticipata. Gli errori `404` e `503` restituiscono pagine HTML inglesi accessibili senza JavaScript. Parametri aggiunti al link breve non vengono trasferiti alla destinazione.
+Implementata: `GET` e `HEAD /r/{shortCode}` pubblici, ricerca esatta e sensibile alle maiuscole su PostgreSQL, `Location` con destinazione originale e `Cache-Control: no-store`. US11 aggiunge cache Redis facoltativa con fallback PostgreSQL; US09 aggiunge scadenza e risposte 410; le statistiche restano da implementare. Gli errori `404`, `410` e `503` restituiscono pagine HTML inglesi accessibili senza JavaScript. Parametri aggiunti al link breve non vengono trasferiti alla destinazione.
 
 **Come visitatore, voglio aprire un link breve, per raggiungere la pagina originale.**
 
@@ -125,9 +125,9 @@ Criteri di accettazione:
 
 **Implementata per l’architettura attuale; verifica browser finale da completare:** `DELETE /api/v1/links/{shortCode}` autenticato, cancellazione transazionale condizionata da codice e proprietario JWT, `204` dopo commit e `404 LINK_NOT_FOUND` indistinguibile per link inesistenti, anonimi, altrui o già eliminati. Dashboard con conferma inline, gestione focus, errore/riprova e aggiornamento della pagina valida dopo eliminazione. I redirect eliminati restituiscono `404`.
 
-**Dipendenza US11:** attualmente i redirect non usano Redis. Quando verrà implementata la cache, invalidare le sue chiavi reali e impedire reinserimenti concorrenti di link eliminati. Nessuna invalidazione Redis speculativa è introdotta da US07.
+**Integrazione US11:** dopo il commit, eliminazione e risoluzione condividono lock locali per impedire reinserimenti obsoleti. La chiave Redis viene invalidata prima del 204; se Redis non risponde, il namespace interessato viene abbandonato. Richieste iniziate dopo il 204 restituiscono 404; redirect già in corso possono completarsi. La garanzia riguarda il singolo backend e le modifiche eseguite tramite applicazione.
 
-**Verifica:** sei scenari mirati aggiunti (tre backend, uno parametrizzato; tre frontend). Superati 23 test unitari backend, 13 verifiche con PostgreSQL, 31 test frontend pertinenti e build frontend. Test di registrazione allineati ai limiti attuali: suite frontend completa superata (41 test), build Docker standard superata (57 test unitari backend) e servizi aggiornati avviati sani nello stack normale. Verifica nel browser di conferma, tastiera e layout da completare: strumenti browser indisponibili/non autorizzati nella sessione.
+**Verifica storica US09:** sei scenari mirati aggiunti (tre backend, uno parametrizzato; tre frontend). Superati 23 test unitari backend, 13 verifiche con PostgreSQL, 31 test frontend pertinenti e build frontend. Test di registrazione allineati ai limiti attuali: suite frontend completa superata (41 test), build Docker standard superata (57 test unitari backend) e servizi aggiornati avviati sani nello stack normale. Verifica nel browser di conferma, tastiera e layout da completare: strumenti browser indisponibili/non autorizzati nella sessione.
 
 **Come utente autenticato, voglio eliminare un mio link, per impedirne ulteriori utilizzi.**
 
@@ -142,7 +142,7 @@ Criteri di accettazione:
 
 ### US08 — Scegliere un alias
 
-Implementata: `POST /api/v1/links` accetta `alias` facoltativo. Dopo `String.strip()`, valori omessi, null o vuoti generano un codice Base62 di 8 caratteri; un alias non vuoto richiede JWT e 3–32 caratteri ASCII tra lettere, numeri, `-` e `_`. Maiuscole e minuscole restano distinte, senza parole riservate. Alias e codici generati condividono l'unicità globale PostgreSQL: collisioni esplicite restituiscono `409 ALIAS_ALREADY_TAKEN`, alias invalidi `400 INVALID_ALIAS`, assenza di login `401`. La dashboard riusa il form e gestisce gli errori; i redirect restano pubblici. Gli alias si integrano con proprietà ed elenco di US05: il JWT determina il proprietario e la dashboard aggiorna la lista dopo la creazione. Eliminazione e scadenza sono implementate; la cache resta pianificata. Il contratto completo è documentato nel README.
+Implementata: `POST /api/v1/links` accetta `alias` facoltativo. Dopo `String.strip()`, valori omessi, null o vuoti generano un codice Base62 di 8 caratteri; un alias non vuoto richiede JWT e 3–32 caratteri ASCII tra lettere, numeri, `-` e `_`. Maiuscole e minuscole restano distinte, senza parole riservate. Alias e codici generati condividono l'unicità globale PostgreSQL: collisioni esplicite restituiscono `409 ALIAS_ALREADY_TAKEN`, alias invalidi `400 INVALID_ALIAS`, assenza di login `401`. La dashboard riusa il form e gestisce gli errori; i redirect restano pubblici. Gli alias si integrano con proprietà ed elenco di US05: il JWT determina il proprietario e la dashboard aggiorna la lista dopo la creazione. Eliminazione, scadenza e cache Redis sono integrate; la verifica combinata della scadenza in cache è superata. Il contratto completo è documentato nel README.
 
 **Come utente autenticato, voglio scegliere un codice personalizzato, per ottenere un link riconoscibile.**
 
@@ -159,11 +159,11 @@ Criteri di accettazione:
 
 **Implementata:** `expiresAt` facoltativo nella creazione autenticata, timestamp ISO-8601 con offset/Z e validazione futura sul server alla precisione dei microsecondi. Migrazione V5 con `TIMESTAMPTZ` nullable: link esistenti senza scadenza. Form e dashboard mostrano ora locale e fuso del browser, `No expiration` oppure scadenza, e stato `EXPIRED` al caricamento/refresh dell’elenco. GET/HEAD restituiscono `410` dall’istante esatto di scadenza, senza Location e con no-store; GET mostra una pagina HTML inglese accessibile. I link scaduti restano copiabili/eliminabili e non liberano l’alias.
 
-**Verifica:** sei scenari mirati aggiunti; 56 test frontend, 72 test unitari backend e 22 integrazioni PostgreSQL superati. Le integrazioni sono passate prima del ripristino dell’ordine delle migrazioni compatibile con il database locale; la riesecuzione è stata rifiutata. Build Docker standard e migrazione/avvio locale successivi verificano V3 proprietari, V4 alias e V5 scadenza, senza modificare lo storico o cancellare dati.
+**Verifica storica US09:** sei scenari mirati aggiunti; 56 test frontend, 72 test unitari backend e 22 integrazioni PostgreSQL superati. Le integrazioni sono passate prima del ripristino dell’ordine delle migrazioni compatibile con il database locale; la riesecuzione è stata rifiutata. Build Docker standard e migrazione/avvio locale successivi verificano V3 proprietari, V4 alias e V5 scadenza, senza modificare lo storico o cancellare dati.
 
-**Verifica browser US09:** su localhost verificati creazione senza scadenza e con alias/scadenza, ora locale Europe/Rome nel risultato e nell’elenco, errore accessibile con conservazione dei dati e focus, invio e annullamento da tastiera. Verificato il passaggio reale dalla destinazione alla pagina Link expired e lo stato Expired dopo refresh, con copia del link scaduto negli appunti reali. Le intestazioni GET/HEAD sono coperte dalle integrazioni automatiche; l’ulteriore controllo HTTP locale da terminale non è stato autorizzato. La verifica della cache resta subordinata a US11.
+**Verifica browser storica US09:** su localhost verificati creazione senza scadenza e con alias/scadenza, ora locale Europe/Rome nel risultato e nell’elenco, errore accessibile con conservazione dei dati e focus, invio e annullamento da tastiera. Verificato il passaggio reale dalla destinazione alla pagina Link expired e lo stato Expired dopo refresh, con copia del link scaduto negli appunti reali. Le intestazioni GET/HEAD sono coperte dalle integrazioni automatiche; l’ulteriore controllo HTTP locale da terminale non è stato autorizzato. La verifica combinata della cache è riportata in US11.
 
-**Dipendenza US11:** nessuna cache redirect attuale. Le future voci devono contenere expiresAt e verificarlo prima del redirect, con TTL limitato alla durata residua. Il criterio della scadenza in cache va verificato con US11.
+**Integrazione US11:** le voci Redis ricevono expiresAt dalla persistenza; la risoluzione verifica la scadenza prima del redirect, anche dopo la scrittura in cache. Il TTL è limitato alla durata residua. I test combinati della scadenza in cache sono superati, inclusa una chiave Redis ancora presente alla scadenza.
 
 **Come utente autenticato, voglio impostare una scadenza, per rendere temporaneo un link.**
 
@@ -191,6 +191,8 @@ Criteri di accettazione:
 - Il raggruppamento giornaliero usa un fuso orario documentato.
 
 ### US11 — Avere redirect rapidi
+
+**Implementata e verificata nel singolo backend, inclusa la scadenza:** cache dei redirect validi con TTL configurabile (5 minuti), hit senza query PostgreSQL e senza rinnovo del TTL, fallback su miss o errore Redis. Coordinamento locale in 256 gruppi di lock e namespace per processo/generazione proteggono eliminazione, recupero Redis e riavvio backend. Timeout Redis predefiniti: 100 ms per connessione e comando. Redis non blocca avvio o salute del backend. Nessuna cache negativa. US09 fornisce persistenza, controllo PostgreSQL e risposta 410. Il record cache conserva expiresAt, il TTL è limitato alla durata residua e la risoluzione controlla la scadenza prima di restituire la destinazione. Voci scadute o con durata inferiore a un millisecondo causano fallback PostgreSQL. Nessuna modifica frontend o migrazione US11. Verifica con test unitari, concorrenza deterministica, PostgreSQL/Redis Testcontainers e smoke test Nginx; nessun obiettivo numerico di latenza.
 
 **Come visitatore, voglio che i link si aprano rapidamente, per raggiungere subito la destinazione.**
 
@@ -250,3 +252,5 @@ Una User Story è completata quando:
 Lo script [scripts/verify.sh](scripts/verify.sh) verifica creazione anonima, registrazione, login, isolamento di due account e persistenza di link e utenti dopo la ricreazione dei container. Verifica anche redirect pubblici `302`, pagina `404` e apertura del link persistito. Le API private e Swagger/OpenAPI restano protetti con `401`; aggiornare le verifiche con l'implementazione delle storie successive.
 
 Il progetto è completato quando due utenti possono registrarsi, creare e gestire separatamente i propri link; redirect, alias, scadenze, cache, limiti e statistiche funzionano; i test passano e il README descrive l'app reale.
+
+**Verifica del merge US09/US11:** 87 test unitari backend, 38 integrazioni (9 registrazione e 29 PostgreSQL/Redis) e 56 test frontend superati, senza errori o test saltati. `docker compose run --rm --no-deps backend-tests mvn -B -ntp -Pintegration clean verify`, `npm test`, `npm run build`, validazione Compose e build delle due immagini superati. Verificati TTL limitato, scadenza durante la scrittura in cache, GET/HEAD 410 con chiave Redis ancora presente e un solo Clock condiviso. Le verifiche storiche precedenti restano distinte; nessuno smoke test sullo stack attivo è stato eseguito e nessun volume dati è stato rimosso.

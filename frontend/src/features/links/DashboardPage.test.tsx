@@ -16,8 +16,9 @@ beforeEach(() => {
 });
 
 it('mostra caricamento, link selezionabili, stato e paginazione', async () => {
-  let resolve!: (value: unknown) => void;
-  fetchMock.mockResolvedValueOnce(response({})).mockImplementationOnce(() => new Promise(r => { resolve = r; }));
+  let resolve = (_value: unknown) => {};
+  const pendingPage = new Promise(r => { resolve = r; });
+  fetchMock.mockResolvedValueOnce(response({})).mockImplementationOnce(() => pendingPage);
   render(<App />);
   await screen.findByText('Loading your links…');
   await act(async () => resolve(response(page)));

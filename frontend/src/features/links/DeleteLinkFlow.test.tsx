@@ -41,7 +41,7 @@ it('confirms inline, cancels without DELETE and handles authenticated 204 withou
   expect(fetchMock.mock.calls.filter(([, options]) => options.method === 'DELETE')).toHaveLength(1);
   expect(fetchMock).toHaveBeenCalledWith(`/api/v1/links/${link.shortCode}`, expect.objectContaining({ method: 'DELETE', headers: expect.objectContaining({ authorization: 'Bearer token' }) }));
   expect(screen.getByText('Link deleted.')).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: 'Your links' })).toHaveFocus();
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'Your links' })).toHaveFocus());
 });
 
 it('refreshes the list and returns to the last valid page after deletion', async () => {
@@ -60,7 +60,7 @@ it('refreshes the list and returns to the last valid page after deletion', async
   await waitFor(() => expect(screen.getByLabelText('Short URL')).toHaveValue('http://localhost:8080/r/Other123'));
   expect(fetchMock.mock.calls.at(-2)?.[0]).toBe('/api/v1/links?page=1&size=20');
   expect(fetchMock.mock.calls.at(-1)?.[0]).toBe('/api/v1/links?page=0&size=20');
-  expect(screen.getByRole('heading', { name: 'Your links' })).toHaveFocus();
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'Your links' })).toHaveFocus());
 });
 
 it('distinguishes deletion failure from refresh failure and allows retry', async () => {

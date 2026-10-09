@@ -53,11 +53,13 @@ services:
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-shortener-local}
       REDIS_HOST: redis
       REDIS_PORT: "6379"
+      REDIRECT_CACHE_ENABLED: ${REDIRECT_CACHE_ENABLED:-true}
+      REDIRECT_CACHE_TTL: ${REDIRECT_CACHE_TTL:-5m}
+      REDIS_CONNECT_TIMEOUT: ${REDIS_CONNECT_TIMEOUT:-100ms}
+      REDIS_TIMEOUT: ${REDIS_TIMEOUT:-100ms}
       SHORTENER_PUBLIC_BASE_URL: ${SHORTENER_PUBLIC_BASE_URL:-http://localhost:${PUBLIC_PORT:-8080}}
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     networks:
       - ingress

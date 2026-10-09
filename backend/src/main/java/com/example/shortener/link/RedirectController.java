@@ -23,7 +23,7 @@ public class RedirectController {
     }
 
     @GetMapping("/r/{shortCode}")
-    @Operation(summary = "Open a short link", description = "Public redirect resolved from PostgreSQL. HEAD returns the same status and headers without a body. Destinations are not fetched. Query parameters on the short URL are not forwarded.")
+    @Operation(summary = "Open a short link", description = "Public redirect resolved from Redis, falling back to PostgreSQL when the cache misses or is unavailable. HEAD returns the same status and headers without a body. Destinations are not fetched. Query parameters on the short URL are not forwarded.")
     @ApiResponses({
             @ApiResponse(responseCode = "302", description = "Redirect to the saved destination", content = @Content,
                     headers = @Header(name = "Location", description = "Original URL encoded as an ASCII URI", schema = @Schema(type = "string", format = "uri"))),
