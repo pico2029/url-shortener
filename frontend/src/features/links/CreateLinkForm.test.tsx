@@ -7,7 +7,7 @@ import { readSession, saveSession } from '../auth/session';
 
 const fetchMock = vi.fn();
 const response = (status: number, body: unknown) => ({ ok: status < 400, status, json: async () => body });
-const created = { originalUrl: 'https://example.com', shortCode: 'Promo-2026', shortUrl: 'http://localhost:8080/r/Promo-2026' };
+const created = { originalUrl: 'https://example.com', shortCode: 'Promo-2026', shortUrl: 'http://localhost:8080/r/Promo-2026', expiresAt: null };
 beforeEach(() => { fetchMock.mockReset(); sessionStorage.clear(); window.history.replaceState(null, '', '/'); vi.stubGlobal('fetch', fetchMock); });
 afterEach(() => vi.unstubAllGlobals());
 

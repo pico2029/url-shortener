@@ -5,7 +5,7 @@ import { App } from '../../app/App';
 import { saveSession } from '../auth/session';
 
 const fetchMock = vi.fn();
-const link = { originalUrl: 'https://example.com/delete', shortCode: 'Ab123456', shortUrl: 'http://localhost:8080/r/Ab123456', createdAt: '2026-10-08T10:00:00Z', status: 'SAVED' };
+const link = { originalUrl: 'https://example.com/delete', shortCode: 'Ab123456', shortUrl: 'http://localhost:8080/r/Ab123456', expiresAt: null, createdAt: '2026-10-08T10:00:00Z', status: 'SAVED' };
 const page = { items: [link], page: 0, size: 20, totalElements: 1, totalPages: 1 };
 const empty = { ...page, items: [], totalElements: 0, totalPages: 0 };
 const response = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body });
@@ -54,7 +54,7 @@ it('refreshes the list and returns to the last valid page after deletion', async
   await screen.findByText('Page 2 of 2');
   fetchMock.mockResolvedValueOnce(response(null, 204))
     .mockResolvedValueOnce(response({ ...page, items: [], page: 1, totalElements: 20 }))
-    .mockResolvedValueOnce(response({ ...page, items: [{ ...link, shortCode: 'Other123', shortUrl: 'http://localhost:8080/r/Other123' }], totalElements: 20 }));
+    .mockResolvedValueOnce(response({ ...page, items: [{ ...link, shortCode: 'Other123', shortUrl: 'http://localhost:8080/r/Other123', expiresAt: null }], totalElements: 20 }));
   await user.click(screen.getByRole('button', { name: 'Delete link' }));
   await user.click(screen.getByRole('button', { name: 'Delete permanently' }));
   await waitFor(() => expect(screen.getByLabelText('Short URL')).toHaveValue('http://localhost:8080/r/Other123'));

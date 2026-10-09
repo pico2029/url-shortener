@@ -20,10 +20,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class RedirectErrorHandler {
     private final String notFound;
     private final String unavailable;
+    private final String expired;
 
     public RedirectErrorHandler() throws IOException {
+        expired = new ClassPathResource("redirect-pages/expired.html").getContentAsString(StandardCharsets.UTF_8);
         notFound = new ClassPathResource("redirect-pages/not-found.html").getContentAsString(StandardCharsets.UTF_8);
         unavailable = new ClassPathResource("redirect-pages/unavailable.html").getContentAsString(StandardCharsets.UTF_8);
+    }
+
+    @ExceptionHandler(LinkExpiredException.class)
+    public ResponseEntity<String> expired(HttpServletRequest request) {
+        return page(HttpStatus.GONE, expired, request);
     }
 
     @ExceptionHandler(LinkNotFoundException.class)

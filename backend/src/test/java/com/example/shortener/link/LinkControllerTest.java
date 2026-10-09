@@ -21,7 +21,7 @@ class LinkControllerTest {
 
     @Test
     void anonymousPostWithoutCsrfReturnsCreated() throws Exception {
-        when(service.create("https://example.com", null, null)).thenReturn(new CreateLinkResponse(
+        when(service.create("https://example.com", null, null, null)).thenReturn(new CreateLinkResponse(
                 "https://example.com", "aB3dE7fG", "http://localhost:8080/r/aB3dE7fG"));
         mvc.perform(post("/api/v1/links").contentType("application/json")
                 .content("{\"originalUrl\":\"https://example.com\"}"))
@@ -31,7 +31,7 @@ class LinkControllerTest {
 
     @Test
     void invalidInputReturnsStructuredError() throws Exception {
-        when(service.create("invalid", null, null)).thenThrow(new InvalidUrlException());
+        when(service.create("invalid", null, null, null)).thenThrow(new InvalidUrlException());
         mvc.perform(post("/api/v1/links").contentType("application/json").content("{\"originalUrl\":\"invalid\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_URL"))
                 .andExpect(jsonPath("$.field").value("originalUrl"));
@@ -46,7 +46,7 @@ class LinkControllerTest {
 
     @Test
     void persistenceFailureDoesNotExposeDetails() throws Exception {
-        when(service.create(any(), any(), any())).thenThrow(new LinkUnavailableException(new RuntimeException("secret")));
+        when(service.create(any(), any(), any(), any())).thenThrow(new LinkUnavailableException(new RuntimeException("secret")));
         mvc.perform(post("/api/v1/links").contentType("application/json").content("{}"))
                 .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("SERVICE_UNAVAILABLE"));
     }
@@ -71,7 +71,7 @@ class LinkControllerTest {
 
     @Test
     void anonymousEmptyAliasesRemainPublic() throws Exception {
-        when(service.create("https://example.com", null, null)).thenReturn(new CreateLinkResponse(
+        when(service.create("https://example.com", null, null, null)).thenReturn(new CreateLinkResponse(
                 "https://example.com", "aB3dE7fG", "http://localhost:8080/r/aB3dE7fG"));
         for (String alias : new String[]{"null", "\"\"", "\"  \""}) {
             mvc.perform(post("/api/v1/links").contentType("application/json")
@@ -84,7 +84,7 @@ class LinkControllerTest {
     void authenticatedAliasIsNormalizedAndCreated() throws Exception {
         var ownerId = java.util.UUID.randomUUID();
         when(currentUser.optionalId(any())).thenReturn(ownerId);
-        when(service.create("https://example.com", "Promo", ownerId)).thenReturn(new CreateLinkResponse(
+        when(service.create("https://example.com", "Promo", ownerId, null)).thenReturn(new CreateLinkResponse(
                 "https://example.com", "Promo", "http://localhost:8080/r/Promo"));
         mvc.perform(post("/api/v1/links").header("Authorization", "Bearer " + token(false))
                 .contentType("application/json").content("{\"originalUrl\":\"https://example.com\",\"alias\":\" Promo \"}"))
@@ -93,8 +93,8 @@ class LinkControllerTest {
 
     @Test
     void invalidAndOccupiedAliasesUseFieldErrors() throws Exception {
-        when(service.create("https://example.com", "bad alias", null)).thenThrow(new InvalidAliasException());
-        when(service.create("https://example.com", "Promo", null)).thenThrow(new AliasAlreadyTakenException());
+        when(service.create("https://example.com", "bad alias", null, null)).thenThrow(new InvalidAliasException());
+        when(service.create("https://example.com", "Promo", null, null)).thenThrow(new AliasAlreadyTakenException());
         mvc.perform(post("/api/v1/links").header("Authorization", "Bearer " + token(false))
                 .contentType("application/json").content("{\"originalUrl\":\"https://example.com\",\"alias\":\"bad alias\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_ALIAS"))

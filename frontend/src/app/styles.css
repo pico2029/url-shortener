@@ -133,3 +133,6 @@ a:hover { color: var(--color-plum-hover); }
   .dashboard-heading h1 { font-size: 2rem; }
   .pagination span { flex-basis: 100%; order: -1; }
 }
+
+.expired-status { color: var(--color-muted); font-weight: 600; }
+.link-expiration { overflow-wrap: anywhere; }

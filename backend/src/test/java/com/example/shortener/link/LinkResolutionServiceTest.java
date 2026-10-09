@@ -8,7 +8,24 @@ import static org.mockito.Mockito.*;
 
 class LinkResolutionServiceTest {
     private final LinkRepository repository = mock(LinkRepository.class);
-    private final LinkResolutionService service = new LinkResolutionService(repository);
+    private final LinkResolutionService service = new LinkResolutionService(repository, java.time.Clock.systemUTC());
+
+    @Test
+    void checksExpirationAtTheExactBoundaryUsingTheCurrentClock() {
+        var clock = mock(java.time.Clock.class);
+        var timedService = new LinkResolutionService(repository, clock);
+        var expiration = java.time.Instant.parse("2030-01-01T10:00:00Z");
+        when(repository.findByShortCode("Timed")).thenReturn(Optional.of(
+                new Link("https://example.com/timed", "Timed", java.util.UUID.randomUUID(), expiration)));
+        when(repository.findByShortCode("Forever")).thenReturn(Optional.of(new Link("https://example.com/forever", "Forever")));
+        when(clock.instant()).thenReturn(expiration.minusNanos(1));
+        assertEquals("https://example.com/timed", timedService.resolve("Timed"));
+        when(clock.instant()).thenReturn(expiration);
+        assertThrows(LinkExpiredException.class, () -> timedService.resolve("Timed"));
+        when(clock.instant()).thenReturn(expiration.plusSeconds(1));
+        assertThrows(LinkExpiredException.class, () -> timedService.resolve("Timed"));
+        assertEquals("https://example.com/forever", timedService.resolve("Forever"));
+    }
 
     @Test
     void resolvesTheSavedDestinationWithoutChangingIt() {

@@ -4,6 +4,7 @@ import { authenticatedJson, endSession, isCancelled } from '../auth/authenticate
 import { readSession, sessionIdentity } from '../auth/session';
 import { CreateLinkForm } from './CreateLinkForm';
 import { CopyLinkButton } from './CopyLinkButton';
+import { LinkExpiration } from './LinkExpiration';
 import { deleteLink, listLinks, type LinkPage } from './linkApi';
 
 type Listing = { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: LinkPage };
@@ -153,7 +154,7 @@ export function DashboardPage() {
             : <ul className="link-list">
               {listing.data.items.map(link => <li key={link.shortCode}>
                 <div className="link-meta">
-                  <span className="saved-status">Saved</span>
+                  <span className={link.status === 'EXPIRED' ? 'expired-status' : 'saved-status'}>{link.status === 'EXPIRED' ? 'Expired' : 'Saved'}</span>
                   <time dateTime={link.createdAt}>{new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(link.createdAt))}</time>
                 </div>
                 <label htmlFor={`link-${link.shortCode}`}>Short URL</label>
@@ -161,6 +162,7 @@ export function DashboardPage() {
                   <input id={`link-${link.shortCode}`} readOnly value={link.shortUrl} onFocus={event => event.currentTarget.select()} />
                   <CopyLinkButton shortUrl={link.shortUrl} />
                 </div>
+                <LinkExpiration expiresAt={link.expiresAt} />
                 <p className="link-destination"><strong>Destination</strong><br />{link.originalUrl}</p>
                 <div className="delete-action">
                   <button type="button" className="delete-button" disabled={deleting || creating}

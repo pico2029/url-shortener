@@ -38,6 +38,18 @@ public class ApiErrorHandler {
         return new ApiError("UNAUTHORIZED", exception.getMessage(), null);
     }
 
+    @ExceptionHandler(com.example.shortener.link.InvalidExpirationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError invalidExpiration(com.example.shortener.link.InvalidExpirationException exception) {
+        return new ApiError("INVALID_EXPIRATION", exception.getMessage(), "expiresAt");
+    }
+
+    @ExceptionHandler(com.example.shortener.link.ExpirationAuthenticationException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ApiError expirationAuthentication(com.example.shortener.link.ExpirationAuthenticationException exception) {
+        return new ApiError("UNAUTHORIZED", exception.getMessage(), null);
+    }
+
     @ExceptionHandler(LinkNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ApiError notFound() {
@@ -52,7 +64,11 @@ public class ApiErrorHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiError malformedJson() {
+    public ApiError malformedJson(HttpMessageNotReadableException exception) {
+        if (exception.getCause() instanceof com.fasterxml.jackson.databind.JsonMappingException mapping
+                && mapping.getPath().stream().anyMatch(ref -> "expiresAt".equals(ref.getFieldName()))) {
+            return new ApiError("INVALID_REQUEST", "Use an ISO-8601 date and time with Z or an offset.", "expiresAt");
+        }
         return new ApiError("INVALID_REQUEST", "The request is invalid.", null);
     }
 

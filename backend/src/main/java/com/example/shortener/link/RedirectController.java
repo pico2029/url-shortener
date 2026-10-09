@@ -29,6 +29,8 @@ public class RedirectController {
                     headers = @Header(name = "Location", description = "Original URL encoded as an ASCII URI", schema = @Schema(type = "string", format = "uri"))),
             @ApiResponse(responseCode = "404", description = "Short code not found",
                     content = @Content(mediaType = "text/html", schema = @Schema(type = "string"))),
+            @ApiResponse(responseCode = "410", description = "Link expired",
+                    content = @Content(mediaType = "text/html", schema = @Schema(type = "string"))),
             @ApiResponse(responseCode = "503", description = "Persistence unavailable",
                     content = @Content(mediaType = "text/html", schema = @Schema(type = "string")))
     })

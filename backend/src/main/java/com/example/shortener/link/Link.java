@@ -22,6 +22,9 @@ public class Link {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "expires_at")
+    private Instant expiresAt;
+
     @Column(name = "owner_id")
     private UUID ownerId;
 
@@ -33,11 +36,19 @@ public class Link {
     }
 
     Link(String originalUrl, String shortCode, UUID ownerId) {
+        this(originalUrl, shortCode, ownerId, null);
+    }
+
+    Link(String originalUrl, String shortCode, UUID ownerId, Instant expiresAt) {
+        this.expiresAt = expiresAt;
         this.ownerId = ownerId;
         this.originalUrl = originalUrl;
         this.shortCode = shortCode;
         this.createdAt = Instant.now();
     }
+
+    public Instant getExpiresAt() { return expiresAt; }
+    public boolean isExpired(Instant now) { return expiresAt != null && !expiresAt.isAfter(now); }
 
     public UUID getOwnerId() { return ownerId; }
     public Instant getCreatedAt() { return createdAt; }

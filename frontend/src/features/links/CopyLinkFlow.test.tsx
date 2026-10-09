@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { App } from '../../app/App';
 import { saveSession } from '../auth/session';
 
-const link = { originalUrl: 'https://example.com/page', shortCode: 'Ab123456', shortUrl: 'http://localhost:8080/r/Ab123456', createdAt: '2026-10-08T10:00:00Z', status: 'SAVED' };
+const link = { originalUrl: 'https://example.com/page', shortCode: 'Ab123456', shortUrl: 'http://localhost:8080/r/Ab123456', expiresAt: null, createdAt: '2026-10-08T10:00:00Z', status: 'SAVED' };
 const fetchMock = vi.fn();
 const writeText = vi.fn();
 const descriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
@@ -62,7 +62,7 @@ it('copies the correct dashboard row with independent feedback and no extra requ
   mockClipboard();
   saveSession({ accessToken: 'token', tokenType: 'Bearer', expiresAt: new Date(Date.now() + 3600000).toISOString() });
   window.history.replaceState(null, '', '/dashboard');
-  const other = { ...link, shortCode: 'Cd654321', shortUrl: 'http://localhost:8080/r/Cd654321' };
+  const other = { ...link, shortCode: 'Cd654321', shortUrl: 'http://localhost:8080/r/Cd654321', expiresAt: null };
   fetchMock.mockResolvedValueOnce(response({})).mockResolvedValueOnce(response({ items: [link, other], page: 0, size: 20, totalElements: 2, totalPages: 1 }));
   render(<App />);
   await screen.findAllByText('Saved');

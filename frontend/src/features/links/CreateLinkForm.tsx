@@ -3,6 +3,8 @@ import { isCancelled } from '../auth/authenticatedApi';
 import { createLink, LinkApiError, type CreatedLink } from './linkApi';
 import { normalizeAlias, validAlias } from './alias';
 import { CopyLinkButton } from './CopyLinkButton';
+import { browserTimeZone, expirationInstant } from './expiration';
+import { LinkExpiration } from './LinkExpiration';
 
 type Submission =
   | { status: 'idle' }
@@ -26,15 +28,18 @@ export function CreateLinkForm({ locale = 'en', authenticated = false, disabled 
   const t = (english: string, italian: string) => locale === 'it' ? italian : english;
   const [originalUrl, setOriginalUrl] = useState('');
   const [alias, setAlias] = useState('');
+  const [expiration, setExpiration] = useState('');
   const [submission, setSubmission] = useState<Submission>({ status: 'idle' });
   const pending = useRef<AbortController | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const expirationInput = useRef<HTMLInputElement>(null);
   const aliasInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => pending.current?.abort(), []);
   useEffect(() => {
     if (submission.status !== 'error') return;
     if (submission.field === 'originalUrl') input.current?.focus();
+    if (submission.field === 'expiresAt') expirationInput.current?.focus();
     if (submission.field === 'alias') aliasInput.current?.focus();
   }, [submission]);
 
@@ -53,12 +58,20 @@ export function CreateLinkForm({ locale = 'en', authenticated = false, disabled 
         'Usa 3–32 lettere ASCII, numeri, trattini o underscore. Maiuscole e minuscole sono distinte.') });
       return;
     }
+    let expiresAt: string | null = null;
+    try {
+      if (authenticated) expiresAt = expirationInstant(expiration);
+    } catch {
+      setSubmission({ status: 'error', field: 'expiresAt', message: t(
+        'Choose a valid date and time in the future.', 'Scegli una data e un’ora valide nel futuro.') });
+      return;
+    }
     const controller = new AbortController();
     pending.current = controller;
     onBusyChange?.(true);
     setSubmission({ status: 'loading' });
     try {
-      const link = await createLink(value, controller.signal, authenticated, locale, normalizedAlias);
+      const link = await createLink(value, controller.signal, authenticated, locale, normalizedAlias, expiresAt);
       if (!controller.signal.aborted) {
         setSubmission({ status: 'success', link });
         onCreated?.();
@@ -79,6 +92,7 @@ export function CreateLinkForm({ locale = 'en', authenticated = false, disabled 
 
   const loading = submission.status === 'loading';
   const invalid = submission.status === 'error' && submission.field === 'originalUrl';
+  const invalidExpiration = submission.status === 'error' && submission.field === 'expiresAt';
   const invalidAlias = submission.status === 'error' && submission.field === 'alias';
 
   return (
@@ -108,6 +122,17 @@ export function CreateLinkForm({ locale = 'en', authenticated = false, disabled 
                 if (submission.status !== 'idle') setSubmission({ status: 'idle' });
               }} />
           </div>}
+          {authenticated && <div>
+            <label htmlFor="expiration">{t('Expiration (optional)', 'Scadenza (facoltativa)')}</label>
+            <p id="expiration-help" className="field-help">{t('Local time', 'Ora locale')} ({browserTimeZone()}). {t('Leave blank for no expiration.', 'Lascia vuoto per nessuna scadenza.')}</p>
+            <input ref={expirationInput} id="expiration" type="datetime-local" step={60} value={expiration}
+              disabled={loading || disabled} aria-invalid={invalidExpiration}
+              aria-describedby={invalidExpiration ? 'expiration-help form-error' : 'expiration-help'}
+              onInput={event => {
+                setExpiration(event.currentTarget.value);
+                if (submission.status !== 'idle') setSubmission({ status: 'idle' });
+              }} />
+          </div>}
           <button type="submit" disabled={loading || disabled}>{loading ? t('Creating your link…', 'Creazione in corso…') : t('Shorten URL', 'Accorcia URL')}</button>
         </div>
         {submission.status === 'error' && <p id="form-error" className="error" role="alert">{submission.message}</p>}
@@ -125,6 +150,7 @@ export function CreateLinkForm({ locale = 'en', authenticated = false, disabled 
                 <CopyLinkButton shortUrl={submission.link.shortUrl} locale={locale} />
               </div>
               <p className="field-help">{t('Copy your link with the button, or select the address to copy it manually.', 'Copia il link con il pulsante oppure seleziona l’indirizzo per copiarlo manualmente.')}</p>
+              <LinkExpiration expiresAt={submission.link.expiresAt} locale={locale} />
               <div className="destination">
                 <h3>{t('Destination', 'Destinazione')}</h3>
                 <p>{submission.link.originalUrl}</p>

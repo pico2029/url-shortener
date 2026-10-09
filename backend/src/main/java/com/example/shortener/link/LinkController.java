@@ -33,7 +33,7 @@ public class LinkController {
 
     @GetMapping
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "List personal links", description = "Requires a Bearer JWT. Returns only the current user's links, newest first. page starts at 0; size defaults to 20 and must be 1–100. Status SAVED indicates a persisted link; public redirects are available.")
+    @Operation(summary = "List personal links", description = "Requires a Bearer JWT. Returns only the current user's links, newest first. page starts at 0; size defaults to 20 and must be 1–100. Status SAVED indicates a non-expired link; EXPIRED indicates a link whose expiration has been reached. expiresAt is UTC or null.")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "Personal links, including an empty page",
                     content = @Content(schema = @Schema(implementation = LinkPageResponse.class))),
             @ApiResponse(responseCode = "400", description = "Invalid pagination or unsupported query parameters"),
@@ -65,12 +65,12 @@ public class LinkController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create a short link", description = "Accepts HTTP/HTTPS URLs up to 8192 characters. A valid Bearer JWT assigns ownership to the current user. Optional aliases require login and 3–32 ASCII letters, numbers, hyphens or underscores, case-sensitive. Surrounding whitespace is stripped; omitted, null or blank aliases generate an eight-character Base62 code. Aliases and generated codes share global uniqueness. Without a token and alias creation is anonymous. Invalid, expired or unknown-user tokens return 401 without insertion. Redirects are public.")
+    @Operation(summary = "Create a short link", description = "Accepts HTTP/HTTPS URLs up to 8192 characters. A valid Bearer JWT assigns ownership to the current user. Optional aliases require login and 3–32 ASCII letters, numbers, hyphens or underscores, case-sensitive. Surrounding whitespace is stripped; omitted, null or blank aliases generate an eight-character Base62 code. Aliases and generated codes share global uniqueness. Without a token and alias creation is anonymous. Invalid, expired or unknown-user tokens return 401 without insertion. Optional expiresAt requires login and an ISO-8601 timestamp with Z or offset, strictly in the future. Omitted or null means no expiration. Redirects are public and return 410 at expiration.")
     @ApiResponses({@ApiResponse(responseCode = "201", description = "Link committed to PostgreSQL",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = CreateLinkResponse.class))),
-            @ApiResponse(responseCode = "400", description = "INVALID_URL, INVALID_ALIAS or INVALID_REQUEST (malformed JSON or non-string alias)",
+            @ApiResponse(responseCode = "400", description = "INVALID_URL, INVALID_ALIAS, INVALID_EXPIRATION or INVALID_REQUEST (malformed JSON or non-string alias)",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "401", description = "Custom alias requires login; invalid, expired or unknown-user tokens are rejected"),
+            @ApiResponse(responseCode = "401", description = "Custom alias or expiration requires login; invalid, expired or unknown-user tokens are rejected"),
             @ApiResponse(responseCode = "409", description = "ALIAS_ALREADY_TAKEN: alias or generated code already exists",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "503", description = "Persistence unavailable",
@@ -78,6 +78,7 @@ public class LinkController {
     public CreateLinkResponse create(@RequestBody CreateLinkRequest request, @AuthenticationPrincipal Jwt jwt) {
         String alias = aliases.normalize(request.alias());
         if (alias != null && jwt == null) throw new AliasAuthenticationException();
-        return service.create(request.originalUrl(), alias, currentUser.optionalId(jwt));
+        if (request.expiresAt() != null && jwt == null) throw new ExpirationAuthenticationException();
+        return service.create(request.originalUrl(), alias, currentUser.optionalId(jwt), request.expiresAt());
     }
 }

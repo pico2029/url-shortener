@@ -2,7 +2,7 @@
 
 ## Stato del progetto
 
-Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard inglese con creazione autenticata, elenco personale paginato e pulsante Log out. US01 aggiunge creazione anonima di link, validazione HTTP/HTTPS, codici Base62 univoci e persistenza PostgreSQL tramite API e form React. US04 e US05 includono logout locale, scadenza della sessione e isolamento dei link per proprietario. US02 aggiunge redirect pubblici `302` e pagine HTML inglesi per codici inesistenti (`404`) e persistenza indisponibile (`503`). US06 aggiunge copia con un clic, conferma ed errore accessibili nel risultato e nell’elenco personale. US07 aggiunge eliminazione definitiva riservata al proprietario e conferma inline nella dashboard. US08 aggiunge alias personalizzati facoltativi alla creazione autenticata. Le statistiche restano da implementare.
+Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard inglese con creazione autenticata, elenco personale paginato e pulsante Log out. US01 aggiunge creazione anonima di link, validazione HTTP/HTTPS, codici Base62 univoci e persistenza PostgreSQL tramite API e form React. US04 e US05 includono logout locale, scadenza della sessione e isolamento dei link per proprietario. US02 aggiunge redirect pubblici `302` e pagine HTML inglesi per codici inesistenti (`404`) e persistenza indisponibile (`503`). US06 aggiunge copia con un clic, conferma ed errore accessibili nel risultato e nell’elenco personale. US07 aggiunge eliminazione definitiva riservata al proprietario e conferma inline nella dashboard. US08 aggiunge alias personalizzati facoltativi alla creazione autenticata. US09 aggiunge scadenza facoltativa, visualizzazione locale e redirect 410 alla scadenza. Le statistiche restano da implementare.
 
 Questo documento definisce il lavoro necessario per realizzare le funzionalità previste nel [README](README.md): link brevi, account, dashboard, alias personalizzati, scadenza, cache, limiti delle richieste e statistiche. Il deployment pubblico resta fuori dal perimetro attuale.
 
@@ -142,7 +142,7 @@ Criteri di accettazione:
 
 ### US08 — Scegliere un alias
 
-Implementata: `POST /api/v1/links` accetta `alias` facoltativo. Dopo `String.strip()`, valori omessi, null o vuoti generano un codice Base62 di 8 caratteri; un alias non vuoto richiede JWT e 3–32 caratteri ASCII tra lettere, numeri, `-` e `_`. Maiuscole e minuscole restano distinte, senza parole riservate. Alias e codici generati condividono l'unicità globale PostgreSQL: collisioni esplicite restituiscono `409 ALIAS_ALREADY_TAKEN`, alias invalidi `400 INVALID_ALIAS`, assenza di login `401`. La dashboard riusa il form e gestisce gli errori; i redirect restano pubblici. Gli alias si integrano con proprietà ed elenco di US05: il JWT determina il proprietario e la dashboard aggiorna la lista dopo la creazione. Eliminazione, scadenza e cache restano pianificate. Il contratto completo è documentato nel README.
+Implementata: `POST /api/v1/links` accetta `alias` facoltativo. Dopo `String.strip()`, valori omessi, null o vuoti generano un codice Base62 di 8 caratteri; un alias non vuoto richiede JWT e 3–32 caratteri ASCII tra lettere, numeri, `-` e `_`. Maiuscole e minuscole restano distinte, senza parole riservate. Alias e codici generati condividono l'unicità globale PostgreSQL: collisioni esplicite restituiscono `409 ALIAS_ALREADY_TAKEN`, alias invalidi `400 INVALID_ALIAS`, assenza di login `401`. La dashboard riusa il form e gestisce gli errori; i redirect restano pubblici. Gli alias si integrano con proprietà ed elenco di US05: il JWT determina il proprietario e la dashboard aggiorna la lista dopo la creazione. Eliminazione e scadenza sono implementate; la cache resta pianificata. Il contratto completo è documentato nel README.
 
 **Come utente autenticato, voglio scegliere un codice personalizzato, per ottenere un link riconoscibile.**
 
@@ -156,6 +156,14 @@ Criteri di accettazione:
 - In assenza di alias viene generato un codice univoco.
 
 ### US09 — Impostare una scadenza
+
+**Implementata:** `expiresAt` facoltativo nella creazione autenticata, timestamp ISO-8601 con offset/Z e validazione futura sul server alla precisione dei microsecondi. Migrazione V5 con `TIMESTAMPTZ` nullable: link esistenti senza scadenza. Form e dashboard mostrano ora locale e fuso del browser, `No expiration` oppure scadenza, e stato `EXPIRED` al caricamento/refresh dell’elenco. GET/HEAD restituiscono `410` dall’istante esatto di scadenza, senza Location e con no-store; GET mostra una pagina HTML inglese accessibile. I link scaduti restano copiabili/eliminabili e non liberano l’alias.
+
+**Verifica:** sei scenari mirati aggiunti; 56 test frontend, 72 test unitari backend e 22 integrazioni PostgreSQL superati. Le integrazioni sono passate prima del ripristino dell’ordine delle migrazioni compatibile con il database locale; la riesecuzione è stata rifiutata. Build Docker standard e migrazione/avvio locale successivi verificano V3 proprietari, V4 alias e V5 scadenza, senza modificare lo storico o cancellare dati.
+
+**Verifica browser US09:** su localhost verificati creazione senza scadenza e con alias/scadenza, ora locale Europe/Rome nel risultato e nell’elenco, errore accessibile con conservazione dei dati e focus, invio e annullamento da tastiera. Verificato il passaggio reale dalla destinazione alla pagina Link expired e lo stato Expired dopo refresh, con copia del link scaduto negli appunti reali. Le intestazioni GET/HEAD sono coperte dalle integrazioni automatiche; l’ulteriore controllo HTTP locale da terminale non è stato autorizzato. La verifica della cache resta subordinata a US11.
+
+**Dipendenza US11:** nessuna cache redirect attuale. Le future voci devono contenere expiresAt e verificarlo prima del redirect, con TTL limitato alla durata residua. Il criterio della scadenza in cache va verificato con US11.
 
 **Come utente autenticato, voglio impostare una scadenza, per rendere temporaneo un link.**
 

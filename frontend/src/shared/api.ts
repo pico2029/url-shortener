@@ -1,6 +1,7 @@
 export type ApiProblem = {
   status?: number;
   code?: string;
+  field?: string;
   detail?: string;
   fieldErrors?: Record<string, string>;
 };
@@ -17,6 +18,7 @@ async function requestResponse(path: string, options: RequestInit): Promise<Resp
     const body: unknown = await response.json().catch(() => null);
     const problem: ApiProblem = { status: response.status };
     if (body && typeof body === 'object') {
+      if ('field' in body && typeof body.field === 'string') problem.field = body.field;
       if ('code' in body && typeof body.code === 'string') problem.code = body.code;
       if ('detail' in body && typeof body.detail === 'string') problem.detail = body.detail;
       if ('fieldErrors' in body && body.fieldErrors && typeof body.fieldErrors === 'object') {

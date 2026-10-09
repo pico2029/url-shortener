@@ -6,7 +6,7 @@ import { saveSession, sessionToken } from '../auth/session';
 
 const fetchMock = vi.fn();
 const response = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body });
-const link = { originalUrl: 'https://example.com/private', shortCode: 'Ab123456', shortUrl: 'http://localhost:8080/r/Ab123456', createdAt: '2026-10-08T10:00:00Z', status: 'SAVED' };
+const link = { originalUrl: 'https://example.com/private', shortCode: 'Ab123456', shortUrl: 'http://localhost:8080/r/Ab123456', expiresAt: null, createdAt: '2026-10-08T10:00:00Z', status: 'SAVED' };
 const page = { items: [link], page: 0, size: 20, totalElements: 21, totalPages: 2 };
 beforeEach(() => {
   fetchMock.mockReset();

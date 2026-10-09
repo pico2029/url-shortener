@@ -6,8 +6,9 @@ export interface CreatedLink {
   originalUrl: string;
   shortCode: string;
   shortUrl: string;
+  expiresAt: string | null;
 }
-export interface PersonalLink extends CreatedLink { createdAt: string; status: 'SAVED' }
+export interface PersonalLink extends CreatedLink { createdAt: string; status: 'SAVED' | 'EXPIRED' }
 export interface LinkPage { items: PersonalLink[]; page: number; size: number; totalElements: number; totalPages: number }
 
 export class LinkApiError extends Error {
@@ -18,12 +19,13 @@ function isCreatedLink(value: unknown): value is CreatedLink {
   return typeof value === 'object' && value !== null
     && 'originalUrl' in value && typeof value.originalUrl === 'string'
     && 'shortCode' in value && typeof value.shortCode === 'string'
-    && 'shortUrl' in value && typeof value.shortUrl === 'string';
+    && 'shortUrl' in value && typeof value.shortUrl === 'string'
+    && 'expiresAt' in value && (value.expiresAt === null || (typeof value.expiresAt === 'string' && Number.isFinite(Date.parse(value.expiresAt))));
 }
 
 function isPersonalLink(value: unknown): value is PersonalLink {
   return isCreatedLink(value) && 'createdAt' in value && typeof value.createdAt === 'string'
-    && Number.isFinite(Date.parse(value.createdAt)) && 'status' in value && value.status === 'SAVED';
+    && Number.isFinite(Date.parse(value.createdAt)) && 'status' in value && (value.status === 'SAVED' || value.status === 'EXPIRED');
 }
 
 export async function listLinks(page: number, signal: AbortSignal): Promise<LinkPage> {
@@ -40,11 +42,11 @@ export async function listLinks(page: number, signal: AbortSignal): Promise<Link
 }
 
 export async function createLink(originalUrl: string, signal: AbortSignal, requireSession = false,
-  locale: 'en' | 'it' = 'en', alias?: string): Promise<CreatedLink> {
+  locale: 'en' | 'it' = 'en', alias?: string, expiresAt?: string | null): Promise<CreatedLink> {
   const options = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ originalUrl, ...(alias ? { alias } : {}) }), signal,
+    body: JSON.stringify({ originalUrl, ...(alias ? { alias } : {}), ...(expiresAt ? { expiresAt } : {}) }), signal,
   };
   try {
     const body: unknown = requireSession || sessionToken()
@@ -68,7 +70,10 @@ export async function createLink(originalUrl: string, signal: AbortSignal, requi
       if (occupiedAlias) message = locale === 'it'
         ? 'Questo alias è già occupato. Scegli un altro alias.'
         : 'This alias is already taken. Choose another alias.';
-      throw new LinkApiError(message, invalid ? 'originalUrl' : invalidAlias || occupiedAlias ? 'alias' : undefined);
+      const expirationError = error.problem.code === 'INVALID_EXPIRATION' || error.problem.field === 'expiresAt';
+      if (expirationError) message = locale === 'it'
+        ? 'Scegli una data e un’ora valide nel futuro.' : 'Choose a valid date and time in the future.';
+      throw new LinkApiError(message, invalid ? 'originalUrl' : invalidAlias || occupiedAlias ? 'alias' : expirationError ? 'expiresAt' : undefined);
     }
     throw error;
   }

@@ -16,7 +16,7 @@ it('invia il JWT anche dalla home e non riprova come anonimo dopo un 401', async
 });
 
 it('crea senza Bearer quando non esiste una sessione', async () => {
-  const link = { originalUrl: 'https://example.com', shortCode: 'Ab123456', shortUrl: 'http://localhost:8080/r/Ab123456' };
+  const link = { originalUrl: 'https://example.com', shortCode: 'Ab123456', shortUrl: 'http://localhost:8080/r/Ab123456', expiresAt: null };
   const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => link });
   vi.stubGlobal('fetch', fetchMock);
   await expect(createLink(link.originalUrl, new AbortController().signal)).resolves.toEqual(link);

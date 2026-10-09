@@ -4,20 +4,20 @@ A URL-shortener project built with a **Java/Spring Boot backend**, a **React/Typ
 
 ## Project status
 
-The project implements US01–US08: anonymous and authenticated creation, registration, JWT login, client logout, a personal dashboard, one-click link copying and owner-only deletion and custom aliases. Statistics remain planned.
+The project implements US01–US09: anonymous and authenticated creation, registration, JWT login, client logout, a personal dashboard, one-click link copying and owner-only deletion, custom aliases and optional expiration. Statistics remain planned.
 
 | Available | To be implemented |
 |---|---|
-| Link creation, public redirects, personal listing, deletion and account APIs | Custom aliases and expiration |
+| Link creation, public redirects, personal listing, deletion and account APIs | Click statistics |
 | English home, account forms, personal dashboard, copying and deletion | Statistics UI |
 | PostgreSQL and Redis configuration | Application caching and rate limiting |
 | Flyway users/links migrations and JPA persistence | Remaining domain migrations |
 | Registration, JWT login, expiry and client logout | JWT revocation (outside current scope) |
 | Authentication endpoint documentation, Swagger UI, and health checks | Documentation for remaining endpoints |
-| Multi-stage Dockerfiles, Docker Compose and custom aliases | Analytics and expiration |
+| Multi-stage Dockerfiles, Docker Compose and custom aliases | Analytics |
 | Infrastructure, registration and persistence checks; feature tests | Remaining feature tests |
 
-**Registration and login are implemented:** `/register` includes password confirmation; `/login` checks existing accounts. Both successful flows navigate to `/dashboard`, with authenticated creation, optional custom aliases, paginated personal links and “Log out”. Registration automatically logs in through the login API. Expiration and statistics remain unimplemented. Generated short URLs can be copied with one click or manually and open their destinations without login.
+**Registration and login are implemented:** `/register` includes password confirmation; `/login` checks existing accounts. Both successful flows navigate to `/dashboard`, with authenticated creation, optional custom aliases, paginated personal links and “Log out”. Registration automatically logs in through the login API. Statistics remain unimplemented. Generated short URLs can be copied with one click or manually and open their destinations without login.
 
 ## Technology stack
 
@@ -230,7 +230,7 @@ The application starts with local defaults without requiring a `.env` file. To c
 
 Default credentials are for local development only. Compose passes `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, and `JWT_SECRET` to the backend. The names `postgres` and `redis` are internal Docker addresses. Frontend API calls use relative `/api/v1/*` paths through Nginx.
 
-Flyway applies `V1__create_users.sql` for users, `V2__create_links.sql` for links, `V3__expand_link_short_code.sql` for 32-character short codes and `V4__add_link_owner.sql` for nullable ownership and a listing index, with unique constraints on email and short code. The merged numbering preserves the local authentication database, which already applied users V1. A database from the separate US01 branch that already recorded links as V1 requires explicit Flyway-history reconciliation before using this merged version; do not delete volumes or blindly repair checksums. A database that already applied ownership as V3 from the separate US05 branch also requires explicit Flyway-history reconciliation; this merge preserves the alias V3 already applied locally. Hibernate does not generate tables. Coordinate migration versions before adding new ones.
+Flyway applies `V1__create_users.sql` for users, `V2__create_links.sql` for links, `V3__add_link_owner.sql` for nullable ownership and a listing index, `V4__expand_link_short_code.sql` for 32-character short codes and `V5__add_link_expiration.sql` for nullable expiration, with unique constraints on email and short code. The merged numbering preserves the local authentication database, which already applied users V1. A database from the separate US01 branch that already recorded links as V1 requires explicit Flyway-history reconciliation before using this merged version; do not delete volumes or blindly repair checksums. The numbering preserves the existing local V3 ownership migration without changing its contents or database history. A different database that already applied expansion as V3 and ownership as V4 needs explicit migration-history reconciliation before upgrading; do not repair it blindly. Hibernate does not generate tables. Coordinate migration versions before adding new ones.
 
 Spring Security allows anonymous link creation (`POST /api/v1/links`), redirects (`GET` and `HEAD /r/{shortCode}`), registration, login and the internal health check. Other routes remain protected: unauthenticated GET requests receive JSON `401`; modifying requests without CSRF tokens receive `403`. Link creation, registration and login POST requests are exempt from CSRF checks. Form login, HTTP Basic, request caching and the generated demo user are disabled. Protected APIs accept an `Authorization: Bearer <token>` header; Swagger/OpenAPI also remain protected. An explicitly supplied invalid Bearer token still receives `401`, including on public routes.
 
@@ -298,7 +298,7 @@ The `/r/` prefix separates short links from SPA pages. Nginx already reserves th
 2. **Backend foundations:** extend the existing account migration, validation, error handling, tests and API documentation to link features.
 3. **Performance:** Redis caching with TTL and rate limiting.
 4. **Account management:** add deletion and automatic copying to the implemented personal dashboard with custom aliases.
-5. **Analytics:** click events, expiration, and statistics.
+5. **Analytics:** click events and statistics.
 
 Hot reload, CI workflows, public deployment, Kafka, Kubernetes, and advanced monitoring are outside the current implementation scope.
 
@@ -369,7 +369,7 @@ Link API errors retain `{code, message, field}`, including `401` for missing, in
 
 PostgreSQL's existing `uk_links_short_code` constraint guarantees uniqueness under concurrency. An explicit alias is inserted once: a collision returns `409`, without generating another code. Automatic codes retain up to five attempts in separate transactions. Success is returned only after commit. The dashboard focuses alias errors and preserves input on validation, conflict or service failure; `401` clears the session and returns to login.
 
-Alias creation integrates with ownership and listing from US05: a JWT associates the new link with the current user and the dashboard refreshes the personal list. Existing anonymous links remain unowned. Deletion, expiration and Redis caching remain planned.
+Alias creation integrates with ownership and listing from US05: a JWT associates the new link with the current user and the dashboard refreshes the personal list. Existing anonymous links remain unowned. Owner-only deletion and optional expiration are implemented; Redis caching remains planned.
 
 ## US02 — Open a short link
 
@@ -529,3 +529,24 @@ docker compose --profile test run --rm backend-tests mvn -B -ntp verify -Pintegr
 It passed 23 unit tests and 13 PostgreSQL integration checks. Frontend feature/session/navigation checks passed 31 tests and the frontend build passed. After aligning registration test fixtures with the current validation rules, the full frontend suite passes all 41 tests. Real-browser confirmation, keyboard and visual verification remain pending because browser automation was unavailable/not authorized in this session.
 
 The standard Docker build now passes all 57 backend unit tests. `docker compose up --build -d --wait --wait-timeout 180` successfully started the updated backend and frontend; Delete link is included in the served dashboard bundle.
+
+
+## US09 — Optional expiration
+
+Authenticated creation accepts `expiresAt` alongside an optional alias:
+
+```json
+{"originalUrl":"https://example.com/page","alias":"Timed-Link","expiresAt":"2030-01-01T12:00:00+01:00"}
+```
+
+`expiresAt` must be an ISO-8601 string with `Z` or an offset, or omitted/null for no expiration. Non-string, malformed and offset-free values return `400 INVALID_REQUEST`; a past or current timestamp returns `400 INVALID_EXPIRATION` with `field: "expiresAt"`. Non-null expiration requires a valid JWT (`401` otherwise). The server truncates to PostgreSQL microsecond precision and checks the value against its UTC Clock immediately before each insert attempt. Creation and listing return `expiresAt` in UTC or null; older links remain unexpired after V5.
+
+The dashboard creation form offers “Expiration (optional)” in the browser’s local timezone, named beside the field. It accepts minute precision, converts to UTC and rejects invalid/normalized local dates or times, including daylight-saving gaps. Ambiguous repeated hours use the browser's local Date conversion. URL, alias and expiration survive errors. The result and personal list display “Expires”, local date/time and timezone, or “No expiration”. Listing status is `SAVED` until expiration and `EXPIRED` at or after it. Status updates on list load/refresh without polling; redirects check current server time on every request.
+
+At `expiresAt <= now`, GET and HEAD `/r/{shortCode}` return `410 Gone`, an English accessible expiration page for GET, no body for HEAD, no `Location` and `Cache-Control: no-store`. Missing or deleted links remain 404. Expiration does not delete a link or release its alias; owners can still copy or delete expired links.
+
+The migration sequence preserves the local deployed V3 ownership migration, expands codes in V4 and adds nullable `TIMESTAMPTZ expires_at` in V5. No database history repair or data deletion is needed for that history. A database with a different already-applied V3/V4 ordering requires explicit reconciliation, not blind repair.
+
+Real-browser checks on localhost verified creation with and without expiration, alias plus expiration, Europe/Rome display, accessible validation preserving the inputs and keyboard submission/cancellation. A live link opened its destination before expiration and showed “Link expired” afterwards; dashboard refresh showed “Expired”, and copying the expired link wrote the full URL to the real clipboard. GET/HEAD status and header assertions are covered by the integration suite; an additional terminal HTTP check was declined.
+
+Six focused scenarios cover legacy migration and persistence, validation/authentication, the exact time boundary, HTTP/list ownership, local form conversion/errors and dashboard actions. Frontend tests pass 56 checks; backend unit tests pass 72 checks; the PostgreSQL suites passed 22 checks before the source migration ordering was restored to match the existing local database. A rerun of those integrations was declined; the standard Docker build and actual local migration/startup verified the restored ordering. Redis caching remains US11: cache entries must carry expiresAt, validate it before redirecting, and cap TTL at remaining lifetime; TTL alone is insufficient.

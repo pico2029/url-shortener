@@ -1,6 +1,9 @@
 package com.example.shortener.link;
 
 import java.sql.SQLException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class LinkService {
+    private final Clock clock;
     private final LinkRepository repository;
     private final UrlValidator validator;
     private final AliasValidator aliases;
@@ -22,7 +26,8 @@ public class LinkService {
     private final TransactionTemplate transaction;
 
     public LinkService(LinkRepository repository, UrlValidator validator, ShortCodeGenerator generator,
-            LinkProperties properties, PlatformTransactionManager transactionManager, AliasValidator aliases) {
+            LinkProperties properties, PlatformTransactionManager transactionManager, AliasValidator aliases, Clock clock) {
+        this.clock = clock;
         this.repository = repository;
         this.validator = validator;
         this.aliases = aliases;
@@ -53,8 +58,9 @@ public class LinkService {
         if (page < 0 || size < 1 || size > 100) throw new InvalidPageException();
         try {
             var result = repository.findByOwnerIdOrderByCreatedAtDescIdDesc(ownerId, PageRequest.of(page, size));
+            Instant now = clock.instant();
             var items = result.getContent().stream().map(link -> new LinkListItem(link.getOriginalUrl(),
-                    link.getShortCode(), properties.shortUrl(link.getShortCode()), link.getCreatedAt(), "SAVED")).toList();
+                    link.getShortCode(), properties.shortUrl(link.getShortCode()), link.getCreatedAt(), link.isExpired(now) ? "EXPIRED" : "SAVED", link.getExpiresAt())).toList();
             return new LinkPageResponse(items, page, size, result.getTotalElements(), result.getTotalPages());
         } catch (DataAccessException exception) {
             throw new LinkUnavailableException(exception);
@@ -66,14 +72,23 @@ public class LinkService {
     }
 
     public CreateLinkResponse create(String originalUrl, String requestedAlias, UUID ownerId) {
+        return create(originalUrl, requestedAlias, ownerId, null);
+    }
+
+    public CreateLinkResponse create(String originalUrl, String requestedAlias, UUID ownerId, Instant expiresAt) {
+        if (expiresAt != null && ownerId == null) throw new ExpirationAuthenticationException();
+        Instant expiration = expiresAt == null ? null : expiresAt.truncatedTo(ChronoUnit.MICROS);
         String alias = aliases.validate(requestedAlias);
         String url = validator.validate(originalUrl);
         int attempts = alias == null ? 5 : 1;
         for (int attempt = 0; attempt < attempts; attempt++) {
             String code = alias == null ? generator.generate() : alias;
             try {
-                transaction.executeWithoutResult(status -> repository.saveAndFlush(new Link(url, code, ownerId)));
-                return new CreateLinkResponse(url, code, properties.shortUrl(code));
+                transaction.executeWithoutResult(status -> {
+                    if (expiration != null && !expiration.isAfter(clock.instant())) throw new InvalidExpirationException();
+                    repository.saveAndFlush(new Link(url, code, ownerId, expiration));
+                });
+                return new CreateLinkResponse(url, code, properties.shortUrl(code), expiration);
             } catch (DataAccessException | TransactionException exception) {
                 if (alias != null && isCodeCollision(exception)) throw new AliasAlreadyTakenException();
                 if (!isCodeCollision(exception) || attempt == 4) {
