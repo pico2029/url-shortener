@@ -79,6 +79,23 @@ Health checks ensure that PostgreSQL is healthy before the backend starts, and t
 
 The Dockerfiles use multi-stage builds: Maven/JDK produces the JAR executed by Java, while Node/npm produces the static files served by Nginx. Maven and npm do not need to be installed on the host.
 
+### Recovering the legacy swapped V3/V4 history
+
+If startup reports V3 applied checksum `772876360` versus local `-1975026989`, and V4 reports the reverse, the database used the earlier expansion/ownership ordering. Keep the current migration files unchanged. Stop the backend and take a full PostgreSQL backup before reconciling history; retain that backup privately because it contains account data.
+
+The manual script `scripts/reconcile-swapped-link-migrations.sql` accepts only that exact legacy history and verifies the 32-character code column, nullable UUID owner, foreign key and listing index. It atomically swaps the recorded versions and script names, preserving each migration's checksum, description, installation rank and timestamp. It does not rerun either migration or change application data. It aborts for any other history, including an already reconciled database. This is specific to the public schema and does not address databases with links originally recorded as V1.
+
+After backing up, run from PowerShell:
+
+```powershell
+docker compose stop backend
+Get-Content -Raw scripts/reconcile-swapped-link-migrations.sql | docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+if ($LASTEXITCODE -ne 0) { throw 'Flyway reconciliation failed' }
+docker compose up -d --wait --wait-timeout 180
+```
+
+Normal Flyway validation remains enabled; startup applies any pending migrations. Do not use a blanket repair or delete the database volume to resolve this mismatch.
+
 ## Repository structure
 
 ```text
