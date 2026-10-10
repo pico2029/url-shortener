@@ -1,3 +1,4 @@
+import { AppLink } from '../../shared/AppLink';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiError, postJson } from '../../shared/api';
 import { navigate } from '../../shared/navigation';
@@ -84,11 +85,24 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   }
 
   return (
-    <main className="registration" lang="en">
-      <a className="back-link" href="/">Back to home</a>
+    <main id="main-content" className="registration account-layout" lang="en" tabIndex={-1}>
+      <aside className="account-context" aria-labelledby="account-context-title">
+        <h2 id="account-context-title">Your links,<br />in one place.</h2>
+        <p>Keep the things you share within reach.</p>
+        <dl className="account-benefits">
+          <div><dt>A name that fits</dt><dd>Choose a custom alias for your short link.</dd></div>
+          <div><dt>Share on your terms</dt><dd>Set an expiration or delete a link when you’re done.</dd></div>
+          <div><dt>See how it’s used</dt><dd>View saved click totals and daily counts in UTC.</dd></div>
+        </dl>
+      </aside>
+      <section className="account-form" aria-label={registering ? 'Registration' : 'Account access'}>
+      <AppLink className="back-link" href="/">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10H4m5-5-5 5 5 5" /></svg>
+        Back to home
+      </AppLink>
       <nav className="auth-navigation" aria-label="Account">
-        <a href="/login" aria-current={!registering ? 'page' : undefined}>Log in</a>
-        <a href="/register" aria-current={registering ? 'page' : undefined}>Register</a>
+        <AppLink href="/login" aria-current={!registering ? 'page' : undefined}>Log in</AppLink>
+        <AppLink href="/register" aria-current={registering ? 'page' : undefined}>Register</AppLink>
       </nav>
       {!registering && new URLSearchParams(window.location.search).get('reason') === 'expired'
         && <p role="status">Your session has expired or is no longer valid. Please log in again.</p>}
@@ -126,6 +140,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
         </button>
         <p className="submission-status" role="status">{pending ? 'Please wait for the operation to complete.' : ''}</p>
       </form>
+      </section>
     </main>
   );
 }

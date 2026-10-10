@@ -92,6 +92,29 @@ components:
 
 # Design System: URL Shortener
 
+## Current frontend layouts — October 2026
+
+The frontend layout refactor preserves the approved Library Plum / Lavender Ground palette, locally hosted Source Sans 3, flat regions, one-pixel separators, and control radius. The original home-page reference below remains historical context where it describes unavailable redirects, availability notices or the previous brand header. Current product capabilities are defined in PRODUCT.md.
+
+The approved composition uses a shared plum header with a linked product mark, contextual navigation and an accessible skip-to-content link. The footer aligns with the same 70rem content width. Primary submit actions are filled plum; copy, refresh, statistics, pagination and logout use a consistent outlined secondary style. Delete uses restrained error-colored text. Keyboard focus and reduced-motion preferences remain supported.
+
+- **Home:** a clear introductory heading and divider lead into the spacious destination/result workspace. A small, factual guidance section explains anonymous creation and personal management. Returned links and copy feedback use actual API results.
+- **Accounts:** a flat two-column composition places account guidance beside the focused form, with Log in/Register tabs and a shared vertical separator. At 48rem and below, the form comes first and the guidance follows.
+- **Dashboard:** creation and its result occupy the left column; the personal link collection occupies the wider right column. Link actions share a row, deletion confirmation stays inline and statistics expand beneath the actions. The collection stacks below creation at 48rem and below.
+- **Statistics:** chart, saved total and daily table share the link region. Colors derive from the central tokens rather than separate analytics colors; no chart library, decorative metrics or raised cards are introduced.
+
+Desktop gutters total 4rem and mobile gutters total 2.5rem. Fields, returned URLs, destinations and action groups allow shrinking and wrapping. Header navigation wraps on small phones, and the account guidance changes reading order only at the layout breakpoint. Only the existing result reveal is animated; no page-load sequence is added.
+
+Verification: all 63 frontend tests, TypeScript/Vite production build and `git diff --check` pass. Automated desktop/mobile browser inspection was requested but permission to run headless Chrome was declined; screenshot and overflow verification remain pending. The frontend preview runs with Vite; real API flows require the backend/proxy environment. No backend or transport behavior changed in this refactor.
+
+### Visual refinement — October 10, 2026
+
+The refinement keeps the approved composition, palette, type family and flat shared ground. The header uses a more compact 5rem height and 1.5rem brand. Section spacing scales from 2rem to 3rem; the account columns use a 1.1:1 ratio with a 3.5rem gap. Account tabs have a tonal active surface and a plum underline. Directional SVG arrows clarify the home return and shortening action without changing their accessible names.
+
+Fields have a stronger hover border; secondary actions use the existing lavender disabled-surface tone on hover. Link destinations use muted text with darker labels, saved status has a small semantic dot, and statistics tables highlight hovered rows. Reduced-motion settings disable field transitions as well as button motion. The compact mobile layouts and existing keyboard focus styles remain in place.
+
+Verification for this refinement: 66 frontend tests pass, the TypeScript/Vite production build passes, and `git diff --check` passes. A new request to inspect desktop/mobile renders with headless Chrome was declined; rendered visual and overflow checks remain unverified. No database, API, or authentication behavior was changed.
+
 ## Overview
 
 **Creative North Star: "Biblioteca contemporanea"**

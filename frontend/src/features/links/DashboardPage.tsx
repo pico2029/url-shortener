@@ -123,9 +123,9 @@ export function DashboardPage() {
     return () => controller.abort();
   }, [access, page, refresh]);
 
-  return <main lang="en" className="dashboard">
+  return <main id="main-content" lang="en" className="dashboard" tabIndex={-1}>
     <header className="dashboard-heading">
-      <h1>Dashboard</h1>
+      <div><h1>Dashboard</h1><p className="intro">A place for the links you share.</p></div>
       <button type="button" onClick={() => endSession()}>Log out</button>
     </header>
     {access === 'checking' && <p role="status">Checking your session…</p>}
@@ -133,8 +133,8 @@ export function DashboardPage() {
       <p role="alert">Your session could not be verified.</p>
       <button onClick={() => setVerificationAttempt(value => value + 1)}>Try again</button>
     </div>}
-    {access === 'ready' && <>
-      <section aria-labelledby="create-title">
+    {access === 'ready' && <div className="dashboard-workspace">
+      <section className="creation-column" aria-labelledby="create-title">
         <h2 id="create-title">Create a personal link</h2>
           <CreateLinkForm locale="en" authenticated disabled={deleting} onBusyChange={setCreating} onCreated={() => {
           setCreated(true);
@@ -168,6 +168,7 @@ export function DashboardPage() {
                 </div>
                 <LinkExpiration expiresAt={link.expiresAt} />
                 <p className="link-destination"><strong>Destination</strong><br />{link.originalUrl}</p>
+                <div className="link-actions">
                 <div className="statistics-action">
                   <button type="button" aria-expanded={statisticsCode === link.shortCode}
                     aria-controls={`statistics-${link.shortCode}`} disabled={deleting}
@@ -175,7 +176,6 @@ export function DashboardPage() {
                     {statisticsCode === link.shortCode ? 'Close statistics' : 'Statistics'}
                   </button>
                 </div>
-                {statisticsCode === link.shortCode && <StatisticsPanel key={link.shortCode} shortCode={link.shortCode} />}
                 <div className="delete-action">
                   <button type="button" className="delete-button" disabled={deleting || creating}
                     hidden={deletion?.code === link.shortCode}
@@ -197,6 +197,8 @@ export function DashboardPage() {
                     </div>
                   </div>}
                 </div>
+                </div>
+                {statisticsCode === link.shortCode && <StatisticsPanel key={link.shortCode} shortCode={link.shortCode} />}
               </li>)}
             </ul>}
           {listing.data.totalPages > 1 && <nav className="pagination" aria-label="Link pages">
@@ -206,6 +208,6 @@ export function DashboardPage() {
           </nav>}
         </>}
       </section>
-    </>}
+    </div>}
   </main>;
 }

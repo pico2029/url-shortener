@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { App } from './App';
@@ -15,6 +15,41 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/login');
 });
 afterEach(() => vi.unstubAllGlobals());
+
+it('mantiene le pagine refattorizzate durante la navigazione tra registrazione, login e home', async () => {
+  window.history.replaceState(null, '', '/register');
+  render(<App />);
+  const user = userEvent.setup();
+  const header = screen.getByRole('banner');
+
+  await user.click(screen.getByRole('link', { name: 'Log in' }));
+  expect(window.location.pathname).toBe('/login');
+  expect(screen.getByRole('heading', { name: 'Log in' })).toBeInTheDocument();
+  expect(screen.getByRole('main')).toHaveClass('account-layout');
+
+  await user.click(screen.getByRole('link', { name: 'Back to home' }));
+  expect(window.location.pathname).toBe('/');
+  expect(screen.getByRole('main')).toHaveClass('home-page');
+
+  await user.click(screen.getByRole('link', { name: 'Create an account' }));
+  expect(window.location.pathname).toBe('/register');
+  expect(screen.getByRole('heading', { name: 'Create an account' })).toBeInTheDocument();
+
+  await user.click(screen.getByRole('link', { name: 'Shorten a URL' }));
+  await user.click(screen.getByRole('link', { name: 'Register' }));
+  await user.click(screen.getByRole('link', { name: 'URL Shortener home' }));
+  await user.click(screen.getByRole('link', { name: 'Log in' }));
+  await user.click(screen.getByRole('link', { name: 'Register' }));
+  expect(window.location.pathname).toBe('/register');
+  expect(screen.getByRole('banner')).toBe(header);
+  expect(fetchMock).not.toHaveBeenCalled();
+
+  act(() => {
+    window.history.replaceState(null, '', '/login');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+  expect(screen.getByRole('heading', { name: 'Log in' })).toBeInTheDocument();
+});
 
 it('accede e naviga alla dashboard personale', async () => {
   fetchMock.mockResolvedValueOnce(response(200, session)).mockResolvedValueOnce(response(200, { email: 'user@example.com' })).mockResolvedValueOnce(response(200, emptyPage));

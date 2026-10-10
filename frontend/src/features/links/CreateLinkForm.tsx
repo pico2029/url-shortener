@@ -97,7 +97,8 @@ export function CreateLinkForm({ locale = 'en', authenticated = false, disabled 
 
   return (
     <div className="link-workspace">
-      <form onSubmit={submit} noValidate aria-busy={loading}>
+      <form className="link-entry" onSubmit={submit} noValidate aria-busy={loading}>
+        {!authenticated && <h2 className="entry-title">Start with a destination</h2>}
         <label htmlFor="original-url">{t('URL to shorten', 'URL da accorciare')}</label>
         <p id="url-help" className="field-help">{t('Include http:// or https://.', 'Includi http:// oppure https://.')}</p>
         <div className="form-row">
@@ -133,7 +134,10 @@ export function CreateLinkForm({ locale = 'en', authenticated = false, disabled 
                 if (submission.status !== 'idle') setSubmission({ status: 'idle' });
               }} />
           </div>}
-          <button type="submit" disabled={loading || disabled}>{loading ? t('Creating your link…', 'Creazione in corso…') : t('Shorten URL', 'Accorcia URL')}</button>
+          <button type="submit" disabled={loading || disabled}>
+            <span>{loading ? t('Creating your link…', 'Creazione in corso…') : t('Shorten URL', 'Accorcia URL')}</span>
+            <svg className="submit-arrow" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12m-5-5 5 5-5 5" /></svg>
+          </button>
         </div>
         {submission.status === 'error' && <p id="form-error" className="error" role="alert">{submission.message}</p>}
         <p className="progress" role="status">{loading ? t('Saving your link.', 'Salvataggio del link.') : ''}</p>
@@ -159,6 +163,7 @@ export function CreateLinkForm({ locale = 'en', authenticated = false, disabled 
             </div>
           ) : (
             <div className="empty-result" aria-live="polite" aria-atomic="true">
+              <svg className="empty-link-symbol" viewBox="0 0 48 48" aria-hidden="true"><path d="M19 31l-3 3a8 8 0 0 1-11-11l10-10a8 8 0 0 1 11 0M29 17l3-3a8 8 0 0 1 11 11L33 35a8 8 0 0 1-11 0M17 31l14-14" /></svg>
               <p>{loading ? t('Your short link is on its way.', 'Stiamo creando il tuo link breve.') : t('Your short link will appear here.', 'Il tuo link breve apparirà qui.')}</p>
               <p className="field-help">{loading ? t('Please wait while we save your URL.', 'Attendi il salvataggio dell’URL.') : t('Enter a URL, then select Shorten URL.', 'Inserisci un URL e premi Accorcia URL.')}</p>
             </div>
