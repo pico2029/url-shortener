@@ -2,7 +2,7 @@
 
 ## Stato del progetto
 
-Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard inglese con creazione autenticata, elenco personale paginato e pulsante Log out. US01 aggiunge creazione anonima di link, validazione HTTP/HTTPS, codici Base62 univoci e persistenza PostgreSQL tramite API e form React. US04 e US05 includono logout locale, scadenza della sessione e isolamento dei link per proprietario. US02 aggiunge redirect pubblici `302` e pagine HTML inglesi per codici inesistenti (`404`) e persistenza indisponibile (`503`). US06 aggiunge copia con un clic, conferma ed errore accessibili nel risultato e nell’elenco personale. US07 aggiunge eliminazione definitiva riservata al proprietario e conferma inline nella dashboard. US08 aggiunge alias personalizzati facoltativi alla creazione autenticata. US09 aggiunge scadenza facoltativa, visualizzazione locale e redirect 410 alla scadenza. Le statistiche restano da implementare.
+Docker Compose, PostgreSQL, Redis e Nginx sono configurati. Sono presenti registrazione con conferma password, persistenza utenti, login JWT e navigazione tra `/register`, `/login` e una dashboard inglese con creazione autenticata, elenco personale paginato e pulsante Log out. US01 aggiunge creazione anonima di link, validazione HTTP/HTTPS, codici Base62 univoci e persistenza PostgreSQL tramite API e form React. US04 e US05 includono logout locale, scadenza della sessione e isolamento dei link per proprietario. US02 aggiunge redirect pubblici `302` e pagine HTML inglesi per codici inesistenti (`404`) e persistenza indisponibile (`503`). US06 aggiunge copia con un clic, conferma ed errore accessibili nel risultato e nell’elenco personale. US07 aggiunge eliminazione definitiva riservata al proprietario e conferma inline nella dashboard. US08 aggiunge alias personalizzati facoltativi alla creazione autenticata. US09 aggiunge scadenza facoltativa, visualizzazione locale e redirect 410 alla scadenza. US10 aggiunge statistiche best effort dei GET, con totale storico e conteggi giornalieri UTC; verifica Nginx/browser ancora da completare.
 
 Questo documento definisce il lavoro necessario per realizzare le funzionalità previste nel [README](README.md): link brevi, account, dashboard, alias personalizzati, scadenza, cache, limiti delle richieste e statistiche. Il deployment pubblico resta fuori dal perimetro attuale.
 
@@ -50,7 +50,7 @@ Criteri di accettazione:
 
 ### US02 — Aprire un link breve
 
-Implementata: `GET` e `HEAD /r/{shortCode}` pubblici, ricerca esatta e sensibile alle maiuscole su PostgreSQL, `Location` con destinazione originale e `Cache-Control: no-store`. US11 aggiunge cache Redis facoltativa con fallback PostgreSQL; US09 aggiunge scadenza e risposte 410; le statistiche restano da implementare. Gli errori `404`, `410` e `503` restituiscono pagine HTML inglesi accessibili senza JavaScript. Parametri aggiunti al link breve non vengono trasferiti alla destinazione.
+Implementata: `GET` e `HEAD /r/{shortCode}` pubblici, ricerca esatta e sensibile alle maiuscole su PostgreSQL, `Location` con destinazione originale e `Cache-Control: no-store`. US11 aggiunge cache Redis facoltativa con fallback PostgreSQL; US09 aggiunge scadenza e risposte 410; US10 registra i GET validi in modo asincrono best effort, escludendo HEAD. Gli errori `404`, `410` e `503` restituiscono pagine HTML inglesi accessibili senza JavaScript. Parametri aggiunti al link breve non vengono trasferiti alla destinazione.
 
 **Come visitatore, voglio aprire un link breve, per raggiungere la pagina originale.**
 
@@ -178,13 +178,21 @@ Criteri di accettazione:
 
 ### US10 — Consultare le statistiche
 
+**Implementata; verifica Nginx/browser da completare:** registrazione asincrona best effort dei GET validi su PostgreSQL, inclusi hit Redis. HEAD ed errori non contano; bot e visite ripetute contano separatamente. Coda limitata configurabile (1000 eventi), senza retry: guasti/saturazione/arresti possono perdere clic senza interrompere il redirect. Ogni evento conserva ID persistente e timestamp della richiesta, senza IP/user agent/referrer. Cache v2 con ID protegge il riutilizzo degli alias. Migrazione V6 con FK cascade: eliminazione rimuove gli eventi e impedisce inserimenti tardivi sul nuovo link.
+
+`GET /api/v1/links/{shortCode}/stats` autenticato restituisce totale storico e 30 giorni UTC inclusivi di oggi, con zeri nei giorni vuoti. Proprietario derivato dal JWT; link anonimi/altrui/inesistenti condividono 404, sessione invalida 401, persistenza indisponibile 503. Link scaduti restano consultabili. Proprietà, totale e giorni condividono uno snapshot repeatable-read. Dashboard inglese con un solo pannello Statistics aperto, grafico SVG, tabella Daily counts, refresh, caricamento, zero, retry e cancellazione delle richieste obsolete.
+
+**Decisioni US10 confermate:** “ogni redirect valido” indica qui ogni GET risolto validamente; HEAD è escluso. La registrazione è best effort, quindi il criterio non garantisce consegna durevole durante guasti. Totale e giorni riflettono soltanto eventi salvati dall’attivazione di US10; i clic precedenti non sono ricostruibili. Nessuna deduplicazione, filtro temporale o statistica dei visitatori unici.
+
+**Verifica del 10 ottobre 2026:** superati 138 test backend (93 unitari, 9 integrazioni registrazione, 36 integrazioni PostgreSQL/Redis), senza fallimenti/errori/test saltati, con `docker compose -p url-shortener-us10-check run --rm --no-deps backend-tests mvn -B -ntp -Pintegration verify`. Superati 63 test frontend, build frontend e validazione Compose. Coperti GET miss/hit, HEAD/errori, proprietà, UTC, zero, concorrenti, guasti, coda piena, cascade/alias ed eventi pendenti, snapshot coerente, cancellazione/sessione/tastiera. La build delle immagini Docker non è stata autorizzata: stack US10, smoke Nginx e verifica visiva desktop/mobile restano da eseguire. Nessun volume database o storico Flyway modificato; verifiche storiche distinte.
+
 **Come proprietario di un link, voglio vedere quanti clic riceve e il loro andamento nel tempo, per capire quanto viene utilizzato.**
 
 Responsabili: P1 backend, P2 interfaccia.
 
 Criteri di accettazione:
 
-- Ogni redirect valido registra un clic, compresi quelli serviti tramite cache.
+- Ogni GET risolto validamente tenta la registrazione asincrona di un clic, compresi gli hit cache; HEAD escluso e consegna best effort come concordato.
 - Sono disponibili il totale dei clic e i conteggi giornalieri.
 - Soltanto il proprietario può consultare le statistiche del link.
 - Un link senza clic mostra zero.

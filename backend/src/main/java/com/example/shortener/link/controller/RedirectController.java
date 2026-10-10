@@ -1,6 +1,5 @@
 package com.example.shortener.link.controller;
 
-import com.example.shortener.link.entity.Link;
 import com.example.shortener.link.service.LinkResolutionService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import java.net.URI;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +26,7 @@ public class RedirectController {
     }
 
     @GetMapping("/r/{shortCode}")
-    @Operation(summary = "Open a short link", description = "Public redirect resolved from Redis, falling back to PostgreSQL when the cache misses or is unavailable. HEAD returns the same status and headers without a body. Destinations are not fetched. Query parameters on the short URL are not forwarded.")
+    @Operation(summary = "Open a short link", description = "Public redirect resolved from Redis, falling back to PostgreSQL when the cache misses or is unavailable. HEAD returns the same status and headers without a body. Successful GETs enqueue best-effort click events; HEAD does not count. Destinations are not fetched. Query parameters on the short URL are not forwarded.")
     @ApiResponses({
             @ApiResponse(responseCode = "302", description = "Redirect to the saved destination", content = @Content,
                     headers = @Header(name = "Location", description = "Original URL encoded as an ASCII URI", schema = @Schema(type = "string", format = "uri"))),
@@ -37,8 +37,8 @@ public class RedirectController {
             @ApiResponse(responseCode = "503", description = "Persistence unavailable",
                     content = @Content(mediaType = "text/html", schema = @Schema(type = "string")))
     })
-    public ResponseEntity<Void> redirect(@PathVariable String shortCode) {
-        URI destination = URI.create(URI.create(service.resolve(shortCode)).toASCIIString());
+    public ResponseEntity<Void> redirect(@PathVariable String shortCode, HttpServletRequest request) {
+        URI destination = URI.create(URI.create(service.resolve(shortCode, "GET".equals(request.getMethod()))).toASCIIString());
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(destination)
                 .cacheControl(CacheControl.noStore())

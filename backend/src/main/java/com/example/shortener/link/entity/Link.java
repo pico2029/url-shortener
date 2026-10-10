@@ -50,6 +50,8 @@ public class Link {
     public Instant getExpiresAt() { return expiresAt; }
     public boolean isExpired(Instant now) { return expiresAt != null && !expiresAt.isAfter(now); }
 
+    public Long getId() { return id; }
+
     public UUID getOwnerId() { return ownerId; }
     public Instant getCreatedAt() { return createdAt; }
 

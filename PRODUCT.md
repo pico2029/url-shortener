@@ -14,7 +14,7 @@ Specific audience segments and usage frequency remain open decisions.
 
 ## Product Purpose
 
-Turn long HTTP/HTTPS URLs into short links that are easy to share. Accounts provide personal link management, custom aliases and optional expiration. Planned click statistics will give owners an understanding of how their links are used.
+Turn long HTTP/HTTPS URLs into short links that are easy to share. Accounts provide personal link management, custom aliases and optional expiration. Click statistics give owners an understanding of how their links are used.
 
 The first complete workflow is entering a destination, receiving and copying a full short URL, and opening it to reach the original destination. The planned full product supports separate users managing only their own links.
 
@@ -28,7 +28,7 @@ Development and verification use Docker Compose, with Nginx serving the React/Ty
 
 ### Current implementation
 
-US01 creates anonymous links through an English React form and `POST /api/v1/links`, validates HTTP/HTTPS destinations, persists eight-character Base62 codes in PostgreSQL and displays full short URLs. Local destinations are allowed; availability is not checked. US02 opens saved links through public 302 redirects, with English HTML pages for missing codes (404) and persistence failures (503). US03 registration is implemented with a public API, PostgreSQL users migration, password hashing, an English `/register` form, and backend/frontend feature tests. Login and JWT session verification are implemented; registration includes password confirmation and automatically logs in. Both forms lead to an English dashboard with authenticated creation, paginated personal links and client logout. US04 and US05 use token-derived ownership and isolate accounts. US08 adds optional custom aliases to authenticated creation; successful creation refreshes the personal list. Existing and newly anonymous links remain unowned; signing in never claims them. US06 adds one-click copying after creation and for each personal link, with independent accessible success/error feedback and manual copying when the Clipboard API is unavailable or denied. Copying requires a secure context (localhost for development, HTTPS for public hosting). US07 adds permanent owner-only deletion with inline confirmation in the dashboard; deleted redirects return 404. US09 adds optional expiration on authenticated creation, UTC persistence, local-time dashboard display, EXPIRED list status and public 410 responses from the exact expiration instant. Existing links without expiration remain valid. Statistics remain unimplemented. US11 supplies optional Redis redirect caching for a single backend, PostgreSQL fallback and deletion coordination that prevents stale repopulation. This merge integrates persisted expiration with cache reads and TTL; combined expiration/cache verification passes. Planned capabilities must not be presented as working features.
+US01 creates anonymous links through an English React form and `POST /api/v1/links`, validates HTTP/HTTPS destinations, persists eight-character Base62 codes in PostgreSQL and displays full short URLs. Local destinations are allowed; availability is not checked. US02 opens saved links through public 302 redirects, with English HTML pages for missing codes (404) and persistence failures (503). US03 registration is implemented with a public API, PostgreSQL users migration, password hashing, an English `/register` form, and backend/frontend feature tests. Login and JWT session verification are implemented; registration includes password confirmation and automatically logs in. Both forms lead to an English dashboard with authenticated creation, paginated personal links and client logout. US04 and US05 use token-derived ownership and isolate accounts. US08 adds optional custom aliases to authenticated creation; successful creation refreshes the personal list. Existing and newly anonymous links remain unowned; signing in never claims them. US06 adds one-click copying after creation and for each personal link, with independent accessible success/error feedback and manual copying when the Clipboard API is unavailable or denied. Copying requires a secure context (localhost for development, HTTPS for public hosting). US07 adds permanent owner-only deletion with inline confirmation in the dashboard; deleted redirects return 404. US09 adds optional expiration on authenticated creation, UTC persistence, local-time dashboard display, EXPIRED list status and public 410 responses from the exact expiration instant. Existing links without expiration remain valid. US10 adds asynchronous best-effort GET click tracking, owner-only lifetime totals and 30 daily UTC counts in an inline dashboard panel. US11 supplies optional Redis redirect caching for a single backend, PostgreSQL fallback and deletion coordination that prevents stale repopulation. This merge integrates persisted expiration with cache reads and TTL; combined expiration/cache verification passes. Planned capabilities must not be presented as working features.
 
 ### Confirmed product decisions
 
@@ -39,9 +39,14 @@ US01 creates anonymous links through an English React form and `POST /api/v1/lin
 - Optional expiration requires authentication. The API accepts ISO-8601 `expiresAt` with Z/offset, stores UTC at microsecond precision and returns UTC or null. The form uses local browser time with its timezone displayed; existing expiration cannot be edited. At the exact expiration instant, GET/HEAD return 410 without Location and with no-store; GET includes an English page with a home link. Expired links remain owned, listed, copyable and deletable, and retain their alias.
 - US11 cache entries must preserve expiresAt and check it before redirecting, with TTL capped at remaining lifetime. TTL alone does not enforce expiration; the combined expiration/cache acceptance tests pass, including a live Redis key at the expiration boundary.
 
+- US10 counts successful GET resolutions, including cache hits, repeated visits and bots; HEAD and redirect errors do not count. Recording runs in a bounded in-memory queue, is best effort, and can lose events on failure, saturation or shutdown. Redirects remain available if recording fails.
+- Statistics show lifetime saved events and the last 30 days including today, grouped by UTC. Only JWT-derived owners can read them, including for expired links. Anonymous links are tracked but cannot be claimed or queried by a later account.
+- Events contain only link ID and request timestamp. No visitor-identifying metadata is collected. Deletion removes events; alias reuse starts a new history. Tracking starts at deployment; historical clicks are unavailable.
+- The Statistics panel preserves the existing dashboard design and presents total, daily bars, a daily-count table, refresh, loading, zero and retry states. Deployment smoke and browser verification of US10 remain pending after Docker image-build permission was declined.
+
 ### Documented implementation scope
 
-The README and user stories define the following planned behavior:
+The README and user stories define the following implemented and planned behavior:
 
 - Accept valid HTTP/HTTPS destinations, persist links, and generate unique Base62 codes.
 - Return a full short URL suitable for copying; use `/r/{shortCode}` for redirects and `/api/v1/*` for application APIs.
@@ -54,7 +59,7 @@ The README and user stories define the following planned behavior:
 - Provide configurable request limits, returning `429` with `Retry-After` when exceeded.
 - Handle applicable loading, empty, success, and error states with understandable feedback.
 
-JWT sessions use per-tab sessionStorage and last one hour. Analytics timezone, rate-limit policies, anonymous-link management, and hosting remain open decisions. No pricing, commercial differentiation, or availability guarantees have been established.
+JWT sessions use per-tab sessionStorage and last one hour. Analytics uses UTC. Rate-limit policies, anonymous-link management, and hosting remain open decisions. No pricing, commercial differentiation, or availability guarantees have been established.
 
 ## Brand Commitments
 

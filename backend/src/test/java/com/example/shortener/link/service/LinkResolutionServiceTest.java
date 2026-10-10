@@ -20,8 +20,9 @@ class LinkResolutionServiceTest {
     private final LinkRepository repository = mock(LinkRepository.class);
     private final RedirectCache cache = mock(RedirectCache.class);
     private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+    private final com.example.shortener.analytics.service.ClickRecorder recorder = mock(com.example.shortener.analytics.service.ClickRecorder.class);
     private final LinkResolutionService service = new LinkResolutionService(repository, cache,
-            new LinkCacheCoordinator(), transactions, clock);
+            new LinkCacheCoordinator(), transactions, clock, recorder);
 
     @BeforeEach
     void setUp() {
@@ -32,24 +33,24 @@ class LinkResolutionServiceTest {
     @Test
     void checksExpirationAtTheExactBoundaryUsingTheCurrentClock() {
         when(repository.findByShortCode("Timed")).thenReturn(Optional.of(
-                new Link("https://example.com/timed", "Timed", java.util.UUID.randomUUID(), expiration)));
+                persisted("https://example.com/timed", "Timed", java.util.UUID.randomUUID(), expiration)));
         when(clock.instant()).thenReturn(expiration.minusNanos(1));
         assertEquals("https://example.com/timed", service.resolve("Timed"));
-        verify(cache).put(eq("Timed"), eq(ResolvedLink.saved("https://example.com/timed", expiration)), any(), anyString());
+        verify(cache).put(eq("Timed"), eq(ResolvedLink.saved(1L, "https://example.com/timed", expiration)), any(), anyString());
         clearInvocations(cache);
         for (var now : new java.time.Instant[]{expiration, expiration.plusSeconds(1)}) {
             when(clock.instant()).thenReturn(now);
             assertThrows(LinkExpiredException.class, () -> service.resolve("Timed"));
         }
         verify(cache, never()).put(anyString(), any(), any(), anyString());
-        when(repository.findByShortCode("Forever")).thenReturn(Optional.of(new Link("https://example.com/forever", "Forever")));
+        when(repository.findByShortCode("Forever")).thenReturn(Optional.of(persisted("https://example.com/forever", "Forever")));
         assertEquals("https://example.com/forever", service.resolve("Forever"));
     }
 
     @Test
     void checksCachedExpirationImmediatelyBeforeReturning() {
         when(cache.get(eq("Timed"), any(), anyString()))
-                .thenReturn(Optional.of(ResolvedLink.saved("https://example.com/timed", expiration)));
+                .thenReturn(Optional.of(ResolvedLink.saved(1L, "https://example.com/timed", expiration)));
         when(clock.instant()).thenReturn(expiration.minusNanos(1));
         assertEquals("https://example.com/timed", service.resolve("Timed"));
         when(clock.instant()).thenReturn(expiration);
@@ -60,7 +61,7 @@ class LinkResolutionServiceTest {
     @Test
     void doesNotRedirectWhenExpirationPassesDuringCachePopulation() {
         when(repository.findByShortCode("Timed")).thenReturn(Optional.of(
-                new Link("https://example.com/timed", "Timed", java.util.UUID.randomUUID(), expiration)));
+                persisted("https://example.com/timed", "Timed", java.util.UUID.randomUUID(), expiration)));
         doAnswer(invocation -> {
             when(clock.instant()).thenReturn(expiration);
             return null;
@@ -72,7 +73,7 @@ class LinkResolutionServiceTest {
     @Test
     void cacheHitAvoidsDatabaseAndDoesNotRenewTtl() {
         when(cache.get(eq("Cached"), any(), anyString()))
-                .thenReturn(Optional.of(ResolvedLink.saved("https://example.com/cached")));
+                .thenReturn(Optional.of(ResolvedLink.saved(1L, "https://example.com/cached")));
         assertEquals("https://example.com/cached", service.resolve("Cached"));
         verifyNoInteractions(repository, transactions);
         verify(cache, never()).put(anyString(), any(), any(), anyString());
@@ -80,17 +81,17 @@ class LinkResolutionServiceTest {
 
     @Test
     void populatesCacheOnlyAfterDatabaseCommit() {
-        when(repository.findByShortCode("Saved")).thenReturn(Optional.of(new Link("https://example.com", "Saved")));
+        when(repository.findByShortCode("Saved")).thenReturn(Optional.of(persisted("https://example.com", "Saved")));
         assertEquals("https://example.com", service.resolve("Saved"));
         var order = inOrder(transactions, cache);
         order.verify(transactions).commit(any());
-        order.verify(cache).put(eq("Saved"), eq(ResolvedLink.saved("https://example.com")), any(), anyString());
+        order.verify(cache).put(eq("Saved"), eq(ResolvedLink.saved(1L, "https://example.com")), any(), anyString());
     }
 
     @Test
     void resolvesTheSavedDestinationWithoutChangingIt() {
         String destination = "https://example.com/café/%20?q=one%2Ftwo#section";
-        when(repository.findByShortCode("aB3dE7fG")).thenReturn(Optional.of(new Link(destination, "aB3dE7fG")));
+        when(repository.findByShortCode("aB3dE7fG")).thenReturn(Optional.of(persisted(destination, "aB3dE7fG")));
         assertEquals(destination, service.resolve("aB3dE7fG"));
     }
 
@@ -109,5 +110,40 @@ class LinkResolutionServiceTest {
         when(repository.findByShortCode("aB3dE7fG")).thenThrow(new DataAccessResourceFailureException("database"));
         assertThrows(DataAccessResourceFailureException.class, () -> service.resolve("aB3dE7fG"));
         verify(cache, never()).put(anyString(), any(), any(), anyString());
+    }
+    @Test
+    void tracksSuccessfulCacheAndDatabaseGetOnlyAfterValidation() {
+        when(cache.get(eq("Cached"), any(), anyString()))
+                .thenReturn(Optional.of(ResolvedLink.saved(42L, "https://example.com/cached")));
+        service.resolve("Cached", true);
+        verify(recorder).record(42L, expiration.minusSeconds(60));
+        verifyNoInteractions(repository, transactions);
+        when(repository.findByShortCode("Saved")).thenReturn(Optional.of(persisted("https://example.com", "Saved")));
+        service.resolve("Saved", true);
+        verify(recorder).record(1L, expiration.minusSeconds(60));
+        service.resolve("Cached", false);
+        verifyNoMoreInteractions(recorder);
+    }
+
+    @Test
+    void failedOrExpiredResolutionsNeverRecordClicks() {
+        when(cache.get(eq("Expired"), any(), anyString()))
+                .thenReturn(Optional.of(ResolvedLink.saved(42L, "https://example.com", expiration.minusSeconds(60))));
+        assertThrows(LinkExpiredException.class, () -> service.resolve("Expired", true));
+        when(repository.findByShortCode("Missing")).thenReturn(Optional.empty());
+        assertThrows(LinkNotFoundException.class, () -> service.resolve("Missing", true));
+        when(repository.findByShortCode("Failed")).thenThrow(new DataAccessResourceFailureException("offline"));
+        assertThrows(DataAccessResourceFailureException.class, () -> service.resolve("Failed", true));
+        verifyNoInteractions(recorder);
+    }
+
+    private static Link persisted(String url, String code) {
+        return persisted(url, code, null, null);
+    }
+
+    private static Link persisted(String url, String code, java.util.UUID owner, java.time.Instant expiresAt) {
+        var link = new Link(url, code, owner, expiresAt);
+        org.springframework.test.util.ReflectionTestUtils.setField(link, "id", 1L);
+        return link;
     }
 }

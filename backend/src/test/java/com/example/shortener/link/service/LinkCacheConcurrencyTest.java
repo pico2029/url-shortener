@@ -36,14 +36,14 @@ class LinkCacheConcurrencyTest {
     @SuppressWarnings("unchecked")
     private final ValueOperations<String, String> values = mock(ValueOperations.class);
     private final ConcurrentHashMap<String, String> stored = new ConcurrentHashMap<>();
-    private final AtomicReference<Link> row = new AtomicReference<>(new Link("https://example.com/old", "Promo"));
+    private final AtomicReference<Link> row = new AtomicReference<>(persisted("https://example.com/old", "Promo"));
     private final ThreadLocal<Boolean> inTransaction = ThreadLocal.withInitial(() -> false);
     private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
     private final LinkCacheCoordinator coordinator = new LinkCacheCoordinator();
     private final RedirectCacheProperties properties = new RedirectCacheProperties(true, Duration.ofMinutes(5));
     private final RedirectCache cache = new RedirectCache(redis, new ObjectMapper().findAndRegisterModules(), properties,
             new RedirectCachePolicy(Clock.systemUTC(), properties), new UrlValidator());
-    private final LinkResolutionService resolution = new LinkResolutionService(repository, cache, coordinator, transactions, Clock.systemUTC());
+    private final LinkResolutionService resolution = new LinkResolutionService(repository, cache, coordinator, transactions, Clock.systemUTC(), mock(com.example.shortener.analytics.service.ClickRecorder.class));
     private final LinkService service = new LinkService(repository, new UrlValidator(), mock(ShortCodeGenerator.class),
             new LinkProperties(URI.create("http://localhost:8080")), transactions, new AliasValidator(), cache, coordinator, Clock.systemUTC());
 
@@ -120,7 +120,7 @@ class LinkCacheConcurrencyTest {
         assertFalse(group.isCurrent(oldGeneration));
         assertEquals(otherGeneration, other.generation());
         assertThrows(LinkNotFoundException.class, () -> resolution.resolve("Promo"));
-        row.set(new Link("https://example.com/new", "Promo"));
+        row.set(persisted("https://example.com/new", "Promo"));
         assertEquals("https://example.com/new", resolution.resolve("Promo"));
     }
 
@@ -171,5 +171,14 @@ class LinkCacheConcurrencyTest {
             assertTrue(stored.containsKey(group.key("Promo", generation)));
             assertFalse(stored.containsKey(group.key("Promo", group.generation())));
         }
+    }
+    private static Link persisted(String url, String code) {
+        return persisted(url, code, null, null);
+    }
+
+    private static Link persisted(String url, String code, java.util.UUID owner, java.time.Instant expiresAt) {
+        var link = new Link(url, code, owner, expiresAt);
+        org.springframework.test.util.ReflectionTestUtils.setField(link, "id", 1L);
+        return link;
     }
 }

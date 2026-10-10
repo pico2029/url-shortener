@@ -1,4 +1,6 @@
 shortener:
+  analytics:
+    queue-capacity: ${ANALYTICS_QUEUE_CAPACITY:1000}
   public-base-url: ${SHORTENER_PUBLIC_BASE_URL:http://localhost:8080}
   redirect-cache:
     enabled: ${REDIRECT_CACHE_ENABLED:true}

@@ -17,6 +17,7 @@ public interface LinkRepository extends JpaRepository<Link, Long> {
     int deleteOwnedLink(@Param("shortCode") String shortCode,
             @Param("ownerId") UUID ownerId);
 
+    Optional<Link> findByShortCodeAndOwnerId(String shortCode, UUID ownerId);
     Optional<Link> findByShortCode(String shortCode);
     Page<Link> findByOwnerIdOrderByCreatedAtDescIdDesc(UUID ownerId, Pageable pageable);
 }

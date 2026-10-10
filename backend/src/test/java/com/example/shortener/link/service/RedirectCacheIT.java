@@ -193,7 +193,7 @@ class RedirectCacheIT {
         var group = coordinator.group(created.shortCode());
         String key = group.key(created.shortCode(), group.generation());
         assertTrue(Boolean.TRUE.equals(redis.hasKey(key)));
-        var restarted = new LinkResolutionService(repository, cache, new LinkCacheCoordinator(), transactions, clock);
+        var restarted = new LinkResolutionService(repository, cache, new LinkCacheCoordinator(), transactions, clock, context.getBean(com.example.shortener.analytics.service.ClickRecorder.class));
         clearInvocations(repository);
         assertEquals(created.originalUrl(), restarted.resolve(created.shortCode()));
         verify(repository).findByShortCode(created.shortCode());

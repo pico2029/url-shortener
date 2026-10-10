@@ -39,7 +39,7 @@ public class RedirectCache {
             String json = redis.opsForValue().get(group.key(code, generation));
             if (json == null) return Optional.empty();
             ResolvedLink link = mapper.readValue(json, ResolvedLink.class);
-            if (link == null || link.version() != 1
+            if (link == null || link.version() != 2 || link.linkId() < 1
                     || !validator.validate(link.originalUrl()).equals(link.originalUrl())) {
                 throw new InvalidUrlException();
             }

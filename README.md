@@ -4,20 +4,20 @@ A URL-shortener project built with a **Java/Spring Boot backend**, a **React/Typ
 
 ## Project status
 
-The project implements US01–US09 and US11: anonymous and authenticated creation, registration, JWT login, client logout, a personal dashboard, one-click link copying and owner-only deletion, custom aliases, optional expiration and Redis redirect caching for a single backend. Rate limiting and statistics remain planned.
+The project implements US01–US11: anonymous and authenticated creation, registration, JWT login, client logout, a personal dashboard, one-click link copying and owner-only deletion, custom aliases, optional expiration and Redis redirect caching for a single backend. Owner-only statistics include saved GET clicks and 30 daily UTC counts. Rate limiting remains planned.
 
 | Available | To be implemented |
 |---|---|
-| Link creation, public redirects, personal listing, deletion and account APIs | Click statistics |
-| English home, account forms, personal dashboard, copying and deletion | Statistics UI |
+| Link creation, public redirects, personal listing, deletion, account and statistics APIs | Rate limiting |
+| English home, account forms, personal dashboard, copying, deletion and inline statistics | Custom analytics date ranges |
 | PostgreSQL persistence and Redis redirect caching | Rate limiting |
-| Flyway users/links migrations and JPA persistence | Remaining domain migrations |
+| Flyway users/links/click-event migrations and persistence | Future domain migrations |
 | Registration, JWT login, expiry and client logout | JWT revocation (outside current scope) |
 | Authentication endpoint documentation, Swagger UI, and health checks | Documentation for remaining endpoints |
-| Multi-stage Dockerfiles, Docker Compose and custom aliases | Analytics |
+| Multi-stage Dockerfiles, Docker Compose and custom aliases | Durable analytics delivery |
 | Infrastructure, registration and persistence checks; feature tests | Remaining feature tests |
 
-**Registration and login are implemented:** `/register` includes password confirmation; `/login` checks existing accounts. Both successful flows navigate to `/dashboard`, with authenticated creation, optional custom aliases, paginated personal links and “Log out”. Registration automatically logs in through the login API. Statistics remain unimplemented. Generated short URLs can be copied with one click or manually and open their destinations without login.
+**Registration and login are implemented:** `/register` includes password confirmation; `/login` checks existing accounts. Both successful flows navigate to `/dashboard`, with authenticated creation, optional custom aliases, paginated personal links and “Log out”. Registration automatically logs in through the login API. Statistics are available through the Statistics button on each personal link, including expired links. Generated short URLs can be copied with one click or manually and open their destinations without login.
 
 ## Technology stack
 
@@ -146,7 +146,7 @@ Implemented backend features use role subpackages without moving responsibilitie
 | `security` | `config`, `service` |
 | `shared` | `config`, `exception` |
 
-Link services, validators, code generation, and redirect-cache helpers share `link/service`; this preserves package-private locking and cache coordination. Controllers and redirect HTML error handling live in `link/controller`, while JSON deserializers live alongside request DTOs in `link/dto`. Focused tests mirror the production subpackage, and broad integration tests remain at the feature root. `RedirectCacheIT` lives alongside the services because it verifies package-private cache coordination. The `analytics` and `ratelimit` backend packages and frontend analytics folder remain placeholders for planned work.
+Link services, validators, code generation, and redirect-cache helpers share `link/service`; this preserves package-private locking and cache coordination. Controllers and redirect HTML error handling live in `link/controller`, while JSON deserializers live alongside request DTOs in `link/dto`. Focused tests mirror the production subpackage, and broad integration tests remain at the feature root. `RedirectCacheIT` lives alongside the services because it verifies package-private cache coordination. The `analytics` backend feature uses JDBC for click events and transactional statistics, and the frontend analytics feature provides the dashboard panel. Only `ratelimit` remains a placeholder.
 
 Generated design-session files and review screenshots (`.impeccable/` and `artifacts/`) are excluded from Git. Installed repository skills and the product/design documentation are retained.
 
@@ -241,6 +241,7 @@ The application starts with local defaults without requiring a `.env` file. To c
 | `POSTGRES_PASSWORD` | `shortener-local` | Local PostgreSQL password |
 | `SHORTENER_PUBLIC_BASE_URL` | `http://localhost:${PUBLIC_PORT}` | Public HTTP/HTTPS origin used in returned short links |
 | `JWT_SECRET` | Empty; a random signing key is generated at startup | Optional Base64-encoded signing secret of at least 32 bytes; retains token validity across backend restarts |
+| `ANALYTICS_QUEUE_CAPACITY` | `1000` | Positive capacity of the bounded in-memory click recording queue |
 | `REDIRECT_CACHE_ENABLED` | `true` | Enable optional Redis redirect caching |
 | `REDIRECT_CACHE_TTL` | `5m` | Positive cache lifetime, at least 1ms; hits do not renew it |
 | `REDIS_CONNECT_TIMEOUT` | `100ms` | Redis connection timeout |
@@ -248,7 +249,7 @@ The application starts with local defaults without requiring a `.env` file. To c
 
 Default credentials are for local development only. Compose passes `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, and `JWT_SECRET` to the backend. The names `postgres` and `redis` are internal Docker addresses. Frontend API calls use relative `/api/v1/*` paths through Nginx.
 
-Flyway applies `V1__create_users.sql` for users, `V2__create_links.sql` for links, `V3__add_link_owner.sql` for nullable ownership and a listing index, `V4__expand_link_short_code.sql` for 32-character short codes and `V5__add_link_expiration.sql` for nullable expiration, with unique constraints on email and short code. The merged numbering preserves the local authentication database, which already applied users V1. A database from the separate US01 branch that already recorded links as V1 requires explicit Flyway-history reconciliation before using this merged version; do not delete volumes or blindly repair checksums. The numbering preserves the existing local V3 ownership migration without changing its contents or database history. A different database that already applied expansion as V3 and ownership as V4 needs explicit migration-history reconciliation before upgrading; do not repair it blindly. Hibernate does not generate tables. Coordinate migration versions before adding new ones.
+Flyway applies `V1__create_users.sql` for users, `V2__create_links.sql` for links, `V3__add_link_owner.sql` for nullable ownership and a listing index, `V4__expand_link_short_code.sql` for 32-character short codes `V5__add_link_expiration.sql` for nullable expiration and `V6__create_click_events.sql` for click events with a cascading link foreign key and time index, with unique constraints on email and short code. The merged numbering preserves the local authentication database, which already applied users V1. A database from the separate US01 branch that already recorded links as V1 requires explicit Flyway-history reconciliation before using this merged version; do not delete volumes or blindly repair checksums. The numbering preserves the existing local V3 ownership migration without changing its contents or database history. A different database that already applied expansion as V3 and ownership as V4 needs explicit migration-history reconciliation before upgrading; do not repair it blindly. Hibernate does not generate tables. Coordinate migration versions before adding new ones.
 
 Spring Security allows anonymous link creation (`POST /api/v1/links`), redirects (`GET` and `HEAD /r/{shortCode}`), registration, login and the internal health check. Other routes remain protected: unauthenticated GET requests receive JSON `401`; modifying requests without CSRF tokens receive `403`. Link creation, registration and login POST requests are exempt from CSRF checks. Form login, HTTP Basic, request caching and the generated demo user are disabled. Protected APIs accept an `Authorization: Bearer <token>` header; Swagger/OpenAPI also remain protected. An explicitly supplied invalid Bearer token still receives `401`, including on public routes.
 
@@ -293,20 +294,13 @@ docker run --rm --mount "type=bind,source=$PWD/frontend,target=/workspace" -w /w
 | `POST` | `/api/v1/links` | Optional Bearer JWT; required for a nonblank alias | Create an anonymous or personal link, with an optional custom alias |
 | `GET`, `HEAD` | `/r/{shortCode}` | Public | `302` to the destination; HTML `404` if absent and `503` if persistence is unavailable |
 | `GET` | `/api/v1/links?page=0&size=20` | Bearer JWT | List only the current user’s links |
+| `GET` | `/api/v1/links/{shortCode}/stats` | Bearer JWT | Owner-only lifetime saved GET clicks and 30 daily UTC counts |
 | `DELETE` | `/api/v1/links/{shortCode}` | Bearer JWT | Permanently delete a personal link and invalidate its cached redirect |
 | `POST` | `/api/v1/auth/register` | Public | Create an account; return `201` with its public fields |
 | `POST` | `/api/v1/auth/login` | Public | Verify credentials; return `200` with a JWT and expiry |
 | `GET` | `/api/v1/auth/me` | Bearer JWT | Return the authenticated user's public fields |
 
 The registration endpoint itself does not issue a token; automatic login is performed by the frontend with a separate request. Detailed contracts appear below.
-
-### Planned
-
-These endpoints **have not been implemented yet**:
-
-| Method | Path | Future behavior |
-|---|---|---|
-| `GET` | `/api/v1/links/{shortCode}/stats` | Retrieve link statistics |
 
 The `/r/` prefix separates short links from SPA pages. Nginx already reserves these paths: API and redirect requests do not receive the frontend HTML fallback.
 
@@ -316,7 +310,7 @@ The `/r/` prefix separates short links from SPA pages. Nginx already reserves th
 2. **Backend foundations:** extend the existing account migration, validation, error handling, tests and API documentation to link features.
 3. **Performance:** Redis caching with TTL is implemented for a single backend; rate limiting remains planned.
 4. **Account management:** deletion, one-click copying, custom aliases and optional expiration are implemented in the personal dashboard.
-5. **Analytics:** click events and statistics.
+5. **Analytics:** asynchronous best-effort GET click events and owner-only statistics are implemented.
 
 Hot reload, CI workflows, public deployment, Kafka, Kubernetes, and advanced monitoring are outside the current implementation scope.
 
@@ -573,13 +567,13 @@ Historical US09 verification: six focused scenarios cover legacy migration and p
 
 Valid resolutions use Redis first and fall back to PostgreSQL on a miss, malformed payload or cache failure. Successful database lookups populate Redis outside the read-only transaction. Only successful resolutions are cached; missing codes and database errors are not. An existing cache hit needs no database query, and remains usable during a PostgreSQL outage. A database failure on a miss retains the HTML 503 response.
 
-The default TTL is five minutes and is not renewed on hits. Set `REDIRECT_CACHE_TTL` to change it, or `REDIRECT_CACHE_ENABLED=false` to bypass Redis. Connection and command timeouts default to 100ms each. These bound the respective Redis operations, not total HTTP latency, which also includes database access and coordination. Keys use `shortener:redirect:v1:<process>:<group>:<generation>:<exact-code>` and JSON stores only a version, the original URL and optional expiration. URLs and authentication data are never logged by the cache; cache warnings are limited to one per 30 seconds.
+The default TTL is five minutes and is not renewed on hits. Set `REDIRECT_CACHE_TTL` to change it, or `REDIRECT_CACHE_ENABLED=false` to bypass Redis. Connection and command timeouts default to 100ms each. These bound the respective Redis operations, not total HTTP latency, which also includes database access and coordination. Keys use `shortener:redirect:v2:<process>:<group>:<generation>:<exact-code>` and JSON stores a version, persistent link ID, original URL and optional expiration. Version 1 payloads and missing/nonpositive IDs are rejected. URLs and authentication data are never logged by the cache; cache warnings are limited to one per 30 seconds.
 
 The single backend shares 256 fair read/write lock groups between resolution and deletion. Deletion waits for earlier resolutions, commits to PostgreSQL, and invalidates the actual Redis key before returning 204. Failed cache operations abandon the group's namespace, preventing old entries from being read after recovery and preventing late writes from entering a new generation. Obsolete keys expire normally; no database-wide Redis flush is used. Backend startup generates a new process namespace. Failed deletion commits also abandon the namespace in case the database outcome is uncertain.
 
 Requests beginning after a successful deletion return 404; redirects already in progress may finish with 302. Alias reuse resolves the new destination. This guarantee covers application operations in one backend process, including Redis outages and restart; multiple concurrent backends and external SQL mutations require a different consistency design.
 
-US09 supplies persisted expiration, API/UI support and 410 responses. Database resolutions carry expiresAt into Redis; expired database results are rejected. The shared UTC Clock drives creation, listing, resolution and cache policy. TTL is capped at remaining lifetime, and expiration is checked immediately before returning a destination, including after cache population. Expired or submillisecond cache entries fall back to PostgreSQL, preserving authoritative 404/410 responses and 503 on database failure. This merge introduces no additional schema or frontend changes; click analytics remain planned. The merged expiration/cache acceptance tests pass, including expiration while a Redis key is still present.
+US09 supplies persisted expiration, API/UI support and 410 responses. Database resolutions carry expiresAt into Redis; expired database results are rejected. The shared UTC Clock drives creation, listing, resolution and cache policy. TTL is capped at remaining lifetime, and expiration is checked immediately before returning a destination, including after cache population. Expired or submillisecond cache entries fall back to PostgreSQL, preserving authoritative 404/410 responses and 503 on database failure. The historical US09/US11 merge introduced no additional schema or frontend changes. US10 now records successful GET clicks asynchronously, including cache hits, without database reads on the redirect cache-hit path. The merged expiration/cache acceptance tests pass, including expiration while a Redis key is still present.
 
 Run unit and integration tests using the commands above. Integration tests use temporary PostgreSQL and Redis containers, including a paused Redis and a restored pre-outage cache snapshot to verify the case where invalidation was lost, and verify startup with Redis unreachable. To verify the actual built Compose stack through Nginx on Windows:
 
@@ -598,3 +592,26 @@ Historical US11 branch verification passed 84 unit tests and 34 integration test
 The combined implementation passes 87 backend unit tests and 38 integration tests (9 registration tests in Surefire and 29 PostgreSQL/Redis tests in Failsafe), with no failures or skips, using `docker compose run --rm --no-deps backend-tests mvn -B -ntp -Pintegration clean verify`. Cleaning removes stale build resources without changing Flyway history. All 56 frontend tests pass with `npm test`; `npm run build`, Compose validation and both Docker image builds pass. Two existing frontend tests were stabilized by creating the deferred response before rendering and waiting for asynchronous focus restoration.
 
 The new cases verify persisted expiration in Redis, capped TTL, exact expiration boundaries on database/cache paths, expiration during cache population, GET/HEAD 410 while a Redis key remains alive, and a single shared Clock bean. Historical branch verification above is separate from this merged verification. The live-stack smoke test was not rerun; no running services or database volumes were recreated or removed.
+
+
+## US10 — Personal click statistics
+
+Only successful public GET resolutions enqueue one click event; HEAD, unknown links, expired links and failed resolutions do not count. Repeat GETs and bots count separately. Anonymous link GETs are also recorded, but their statistics cannot be queried or claimed by signing in. Tracking starts when US10 is deployed; earlier clicks cannot be reconstructed.
+
+A dedicated worker writes events to PostgreSQL from a bounded in-memory queue (`ANALYTICS_QUEUE_CAPACITY`, default 1000, minimum 1). Each event stores only the persistent link ID and request-time UTC timestamp. No IP, user agent or referrer is stored. Writes happen outside redirect transactions and never delay cache-hit resolution for a database write. Full queues, persistence failures and process termination may lose events; there is no retry or durable delivery guarantee. Counts may appear shortly after a redirect. Shutdown waits up to five seconds for queued tasks. Warnings are throttled to one per 30 seconds and omit link destinations and authentication data.
+
+Flyway V6 adds `click_events` with an index on `(link_id, occurred_at)` and `ON DELETE CASCADE`. Deleting a link removes its stored events. Pending events for a deleted ID are discarded by the foreign key, so alias reuse starts with zero clicks. Redis keys and payloads now use version 2 with the persistent link ID; old or invalid entries fall back to PostgreSQL.
+
+`GET /api/v1/links/{shortCode}/stats` requires a valid Bearer JWT for the link's owner. It returns `200` with `Cache-Control: no-store` for owned links, including expired links; missing, anonymous and other owners' links return the same `404 LINK_NOT_FOUND`. Missing/invalid/expired/unknown-user identity returns `401`; database failures return `503 SERVICE_UNAVAILABLE`, using the existing `{code, message, field}` error shape. Ownership, lifetime total and daily aggregation share a read-only repeatable-read database snapshot. Statistics are not cached.
+
+The response contains `shortCode`, `totalClicks` (all saved events for that link), `timezone` (`UTC`), inclusive date strings `from`/`to`, and `daily` entries `{date, clicks}`. `daily` always contains 30 ascending UTC dates, from today minus 29 days through today, with zeros for missing days. Lifetime total can exceed the sum of the displayed days. UTC aggregation does not depend on browser or database-session timezone.
+
+Each dashboard row has a Statistics button. Only one panel opens at a time, with loading, zero, error/retry, Refresh and Close statistics states. It displays the lifetime total, a 30-day bar chart, an accessible Daily counts table and the best-effort recording caveat. Navigation, deletion and logout cancel pending requests and suppress stale results. The existing English interface, visual system and authentication client are reused; no chart dependency was added.
+
+### US10 verification — 2026-10-10
+
+`docker compose -p url-shortener-us10-check run --rm --no-deps backend-tests mvn -B -ntp -Pintegration verify` passed 138 backend tests: 93 unit tests, 9 registration integrations in Surefire, and 36 PostgreSQL/Redis integrations in Failsafe. There were no failures, errors or skips. New coverage includes cache and database GET counting, HEAD/error exclusion, anonymous tracking without access, UTC boundaries/zero days/lifetime totals, expired-link access, authorization, concurrent redirects, deletion/cascade/alias reuse, rejected/full queues, failed writes, and snapshot consistency when a concurrent event commits between the total and daily queries. Existing US11 expiration, invalidation and fallback tests also pass.
+
+All 63 frontend tests pass with `npm test`; `npm run build`, Compose configuration validation and `git diff --check` pass. Frontend tests cover on-demand loading, refresh/zero/table values, expired links, retry/malformed responses, session expiry, keyboard controls, cancellation and stale responses on selection/navigation/deletion/logout.
+
+Docker image build was requested but permission was declined. No US10 stack was started, no new Nginx smoke test or desktop/mobile browser inspection was performed, and no existing database volume or Flyway history was changed. These deployment and visual checks remain pending; the automated results do not certify them. Historical US09/US11 results above describe earlier code and remain separate.

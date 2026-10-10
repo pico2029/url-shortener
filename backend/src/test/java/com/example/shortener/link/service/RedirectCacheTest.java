@@ -34,7 +34,7 @@ class RedirectCacheTest {
     void writesVersionedJsonWithTtlAndDoesNotRenewOnHit() throws Exception {
         String generation = group.generation();
         String key = group.key("Promo", generation);
-        var link = ResolvedLink.saved("https://example.com/café/%20?q=one%2Ftwo#fragment");
+        var link = ResolvedLink.saved(1L, "https://example.com/café/%20?q=one%2Ftwo#fragment");
         cache.put("Promo", link, group, generation);
         verify(values).set(key, mapper.writeValueAsString(link), Duration.ofMinutes(5));
         when(values.get(key)).thenReturn(mapper.writeValueAsString(link));
@@ -46,12 +46,14 @@ class RedirectCacheTest {
     @Test
     void malformedPayloadAndReadFailureAbandonNamespace() {
         for (String json : new String[]{"{", "null", "{\"version\":2,\"originalUrl\":\"https://example.com\"}",
-                "{\"version\":1,\"originalUrl\":\"javascript:alert(1)\"}"}) {
+                "{\"version\":1,\"linkId\":1,\"originalUrl\":\"https://example.com\"}",
+                "{\"version\":2,\"linkId\":-1,\"originalUrl\":\"https://example.com\"}",
+                "{\"version\":2,\"linkId\":1,\"originalUrl\":\"javascript:alert(1)\"}"}) {
             String generation = group.generation();
             when(values.get(group.key("Promo", generation))).thenReturn(json);
             assertTrue(cache.get("Promo", group, generation).isEmpty());
             assertFalse(group.isCurrent(generation));
-            cache.put("Promo", ResolvedLink.saved("https://example.com"), group, generation);
+            cache.put("Promo", ResolvedLink.saved(1L, "https://example.com"), group, generation);
         }
         verify(values, never()).set(anyString(), anyString(), any(Duration.class));
         String generation = group.generation();
@@ -65,7 +67,7 @@ class RedirectCacheTest {
         String generation = group.generation();
         doThrow(new DataAccessResourceFailureException("secret")).when(values)
                 .set(anyString(), anyString(), any(Duration.class));
-        assertDoesNotThrow(() -> cache.put("Promo", ResolvedLink.saved("https://example.com"), group, generation));
+        assertDoesNotThrow(() -> cache.put("Promo", ResolvedLink.saved(1L, "https://example.com"), group, generation));
         assertFalse(group.isCurrent(generation));
         String next = group.generation();
         when(redis.delete(group.key("Promo", next))).thenThrow(new DataAccessResourceFailureException("secret"));
@@ -76,12 +78,12 @@ class RedirectCacheTest {
     @Test
     void expiryPolicyCapsTtlAndRejectsExpiredOrSubmillisecondEntries() throws Exception {
         String generation = group.generation();
-        var future = new ResolvedLink(1, "https://example.com", now.plusSeconds(12));
+        var future = new ResolvedLink(2, 1L, "https://example.com", now.plusSeconds(12));
         cache.put("Promo", future, group, generation);
         verify(values).set(group.key("Promo", generation), mapper.writeValueAsString(future), Duration.ofSeconds(12));
-        assertEquals(Duration.ofMinutes(5), policy.ttl(new ResolvedLink(1, future.originalUrl(), now.plusSeconds(900))));
+        assertEquals(Duration.ofMinutes(5), policy.ttl(new ResolvedLink(2, 1L, future.originalUrl(), now.plusSeconds(900))));
         for (Instant expiry : new Instant[]{Instant.MIN, now.minusSeconds(1), now, now.plusNanos(999999)}) {
-            var expired = new ResolvedLink(1, future.originalUrl(), expiry);
+            var expired = new ResolvedLink(2, 1L, future.originalUrl(), expiry);
             cache.put("Promo", expired, group, generation);
             when(values.get(group.key("Promo", generation))).thenReturn(mapper.writeValueAsString(expired));
             assertTrue(cache.get("Promo", group, generation).isEmpty());
@@ -95,7 +97,7 @@ class RedirectCacheTest {
                 policy, new UrlValidator());
         clearInvocations(redis);
         assertTrue(disabled.get("Promo", group, group.generation()).isEmpty());
-        disabled.put("Promo", ResolvedLink.saved("https://example.com"), group, group.generation());
+        disabled.put("Promo", ResolvedLink.saved(1L, "https://example.com"), group, group.generation());
         disabled.invalidate("Promo", group, group.generation());
         verifyNoInteractions(redis);
         assertThrows(IllegalArgumentException.class, () -> new RedirectCacheProperties(true, Duration.ZERO));

@@ -21,7 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.*;
 
-@RestControllerAdvice(assignableTypes = LinkController.class)
+@RestControllerAdvice(assignableTypes = {LinkController.class, com.example.shortener.analytics.controller.StatisticsController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class ApiErrorHandler {
     public record ApiError(String code, String message, String field) {}

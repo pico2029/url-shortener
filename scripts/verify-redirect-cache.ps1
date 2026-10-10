@@ -36,7 +36,7 @@ function Invoke-Api {
 
 function Get-CacheKeys {
   param([string]$Code)
-  return @(Invoke-Docker -Arguments @('compose', 'exec', '-T', 'redis', 'redis-cli', '--scan', '--pattern', "shortener:redirect:v1:*:$Code"))
+  return @(Invoke-Docker -Arguments @('compose', 'exec', '-T', 'redis', 'redis-cli', '--scan', '--pattern', "shortener:redirect:v2:*:$Code"))
 }
 
 function Assert-Redirect {

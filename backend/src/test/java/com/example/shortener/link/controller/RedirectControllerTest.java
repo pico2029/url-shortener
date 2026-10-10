@@ -29,7 +29,7 @@ class RedirectControllerTest {
     @Test
     void redirectsAnonymouslyWithoutForwardingShortUrlQueryParameters() throws Exception {
         String destination = "https://example.com/path%2Fpart?q=one%20two#section";
-        when(service.resolve("aB3dE7fG")).thenReturn(destination);
+        when(service.resolve("aB3dE7fG", true)).thenReturn(destination);
         mvc.perform(get("/r/aB3dE7fG").queryParam("extra", "ignored"))
                 .andExpect(status().isFound())
                 .andExpect(header().string("Location", destination))
@@ -39,7 +39,7 @@ class RedirectControllerTest {
 
     @Test
     void encodesUnicodeWithoutDoubleEncodingExistingEscapes() throws Exception {
-        when(service.resolve("aB3dE7fG")).thenReturn("http://localhost:3000/café/%20?q=è%2F#é");
+        when(service.resolve("aB3dE7fG", true)).thenReturn("http://localhost:3000/café/%20?q=è%2F#é");
         mvc.perform(get("/r/aB3dE7fG"))
                 .andExpect(status().isFound())
                 .andExpect(header().string("Location", "http://localhost:3000/caf%C3%A9/%20?q=%C3%A8%2F#%C3%A9"));
@@ -47,7 +47,7 @@ class RedirectControllerTest {
 
     @Test
     void missingCodeReturnsAnEnglishHtmlPageWithoutReflectingTheCode() throws Exception {
-        when(service.resolve("missing-code")).thenThrow(new LinkNotFoundException());
+        when(service.resolve("missing-code", true)).thenThrow(new LinkNotFoundException());
         mvc.perform(get("/r/missing-code").accept("text/html"))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType("text/html;charset=UTF-8"))
@@ -63,7 +63,7 @@ class RedirectControllerTest {
     void databaseAndTransactionFailuresReturn503WithoutInternalDetails(boolean transaction) throws Exception {
         RuntimeException failure = transaction ? new CannotCreateTransactionException("secret database details")
                 : new DataAccessResourceFailureException("secret database details");
-        when(service.resolve("aB3dE7fG")).thenThrow(failure);
+        when(service.resolve("aB3dE7fG", true)).thenThrow(failure);
         mvc.perform(get("/r/aB3dE7fG"))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(content().contentType("text/html;charset=UTF-8"))
@@ -76,7 +76,7 @@ class RedirectControllerTest {
 
     @Test
     void headReturnsRedirectHeadersWithoutABody() throws Exception {
-        when(service.resolve("aB3dE7fG")).thenReturn("https://example.com/path?q=one#fragment");
+        when(service.resolve("aB3dE7fG", false)).thenReturn("https://example.com/path?q=one#fragment");
         mvc.perform(head("/r/aB3dE7fG"))
                 .andExpect(status().isFound())
                 .andExpect(header().string("Location", "https://example.com/path?q=one#fragment"))
@@ -86,8 +86,8 @@ class RedirectControllerTest {
 
     @Test
     void headErrorPagesHaveTheSameHeadersAndNoBody() throws Exception {
-        when(service.resolve("missing")).thenThrow(new LinkNotFoundException());
-        when(service.resolve("unavailable")).thenThrow(new CannotCreateTransactionException("secret"));
+        when(service.resolve("missing", false)).thenThrow(new LinkNotFoundException());
+        when(service.resolve("unavailable", false)).thenThrow(new CannotCreateTransactionException("secret"));
         mvc.perform(head("/r/missing"))
                 .andExpect(status().isNotFound()).andExpect(content().contentType("text/html;charset=UTF-8"))
                 .andExpect(header().string("Cache-Control", "no-store")).andExpect(content().string(""));

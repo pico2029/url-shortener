@@ -4,6 +4,7 @@ import { authenticatedJson, endSession, isCancelled } from '../auth/authenticate
 import { readSession, sessionIdentity } from '../auth/session';
 import { CreateLinkForm } from './CreateLinkForm';
 import { CopyLinkButton } from './CopyLinkButton';
+import { StatisticsPanel } from '../analytics/StatisticsPanel';
 import { LinkExpiration } from './LinkExpiration';
 import { deleteLink, listLinks, type LinkPage } from './linkApi';
 
@@ -17,6 +18,7 @@ export function DashboardPage() {
   const [listing, setListing] = useState<Listing>({ status: 'loading' });
   const [created, setCreated] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [statisticsCode, setStatisticsCode] = useState<string | null>(null);
   const [deletion, setDeletion] = useState<{ code: string; status: 'confirming' | 'running' | 'error' } | null>(null);
   const [deleteFeedback, setDeleteFeedback] = useState('');
   const deleting = deletion?.status === 'running';
@@ -47,6 +49,7 @@ export function DashboardPage() {
     if (pendingDelete.current) return;
     const controller = new AbortController();
     pendingDelete.current = controller;
+    setStatisticsCode(null);
     setDeletion({ code, status: 'running' });
     setDeleteFeedback('');
     setCreated(false);
@@ -91,6 +94,7 @@ export function DashboardPage() {
   useEffect(() => {
     if (access !== 'ready') return;
     const controller = new AbortController();
+    setStatisticsCode(null);
     setListing({ status: 'loading' });
     listLinks(page, controller.signal).then(data => {
       if (!controller.signal.aborted) {
@@ -164,6 +168,14 @@ export function DashboardPage() {
                 </div>
                 <LinkExpiration expiresAt={link.expiresAt} />
                 <p className="link-destination"><strong>Destination</strong><br />{link.originalUrl}</p>
+                <div className="statistics-action">
+                  <button type="button" aria-expanded={statisticsCode === link.shortCode}
+                    aria-controls={`statistics-${link.shortCode}`} disabled={deleting}
+                    onClick={() => setStatisticsCode(current => current === link.shortCode ? null : link.shortCode)}>
+                    {statisticsCode === link.shortCode ? 'Close statistics' : 'Statistics'}
+                  </button>
+                </div>
+                {statisticsCode === link.shortCode && <StatisticsPanel key={link.shortCode} shortCode={link.shortCode} />}
                 <div className="delete-action">
                   <button type="button" className="delete-button" disabled={deleting || creating}
                     hidden={deletion?.code === link.shortCode}

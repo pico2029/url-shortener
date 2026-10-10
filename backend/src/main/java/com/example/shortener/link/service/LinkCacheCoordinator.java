@@ -13,7 +13,7 @@ public class LinkCacheCoordinator {
     public LinkCacheCoordinator() {
         String process = UUID.randomUUID().toString();
         for (int i = 0; i < groups.length; i++) {
-            groups[i] = new Group("shortener:redirect:v1:" + process + ":" + i + ":");
+            groups[i] = new Group("shortener:redirect:v2:" + process + ":" + i + ":");
         }
     }
 
